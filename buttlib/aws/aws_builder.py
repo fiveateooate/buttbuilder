@@ -22,12 +22,14 @@ class Builder(buttlib.common.ButtBuilder):
 
     def __init__(self, env_info, args):
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
-        self.__aws_session = boto3.Session(profile_name='weave-ca')
+        self.__aws_session = boto3.Session(profile_name='weave')
         self.__aws_client = self.__aws_session.client('ec2', region_name=self._env_info['Region'])
         self.__aws_resource = self.__aws_session.resource(
             'ec2', region_name=self._env_info['Region'])
         self.__buttnet = "%s-net" % (self._cluster_info['cluster_name'])
         self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "%s/ssl" % self._cluster_info['buttdir'])
+        #self._master_ip_offset = 30
+        #self._worker_ip_offset = 50
         self._cluster_info['network_name'] = "net-%s" % self._cluster_info[
             'cluster_name']
         self._cluster_info['ip'] = "$private_ipv4"
@@ -35,7 +37,7 @@ class Builder(buttlib.common.ButtBuilder):
             ipaddress.IPv4Network(self._env_info['externalNet'])[2])
         self._cluster_info['kube_masters'] = self.get_kube_masters()
         self.__ip_offset = {'masters': 10, "workers": 30}
-        self._cluster_info['master_ip'] = "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
+        self._cluster_info['master_ip'] = "10.250.250.10" #"lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
         self._cluster_info['cloud_provider'] = "aws"
 
     def __get_ami(self):
@@ -173,7 +175,7 @@ class Builder(buttlib.common.ButtBuilder):
         vm_info['BlockDeviceMappings'] = [self.__get_disk_map(
             role, vm_info['hostname'])]
         vm_info[
-            'additional_labels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(
+            'additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(
                 self._env_info['Region'], zone)
         vm_info['TagSpecifications'] = [{'ResourceType': 'instance', 'Tags':[{"Key": "Name", "Value": vm_info['hostname']}, {"Key": "cluster-role", "Value": re.sub(r"s$", "", role)}]}]
         vm_info['NetworkInterfaces'] = [{
@@ -193,7 +195,7 @@ class Builder(buttlib.common.ButtBuilder):
         hostnames.append(self._cluster_info['master_ip'])
         self.__ssl_helper.createCerts(self.get_master_ips(),
                                       self._cluster_info["cluster_ip"],
-                                      hostnames + self.get_aws_master_hosts(self.get_master_ips()))
+                                      hostnames)
         ami = self.__get_ami()
         availability_zones = self.__get_availability_zones()
         for cluster_role in ['masters', 'workers']:

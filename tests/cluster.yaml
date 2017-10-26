@@ -1,0 +1,36 @@
+noenv:buttbuildertest:
+  clusterDomain: cluster.local
+  kubeletVersion: v1.7.9_coreos.0
+  externalNet: "10.254.0.0/24"
+  clusterNet: "192.168.66.0/24"
+  coreosChannel: stable
+  provider: gce
+  project: weave-lab
+  region: us-central1
+  officeIP:
+    - "205.197.215.90/32"
+    - "66.219.192.186/32"
+  googleHealthChecks:
+    - "209.85.152.0/22"
+    - "209.85.204.0/22"
+    - "35.191.0.0/16"
+  masters:
+    nodes: 1
+    machineType: g1-small
+    rootDiskSize: 12
+  workers:
+    nodes: 3
+    machineType: n1-standard-2
+    rootDiskSize: 40
+  current_versions_file: dev/versions.yaml
+  services:
+    namespaces:
+      ops:
+      - chart: weavelab/alertmanager
+      - chart: weavelab/grafana
+      - chart: weavelab/kafka
+      - chart: weavelab/node-exporter
+      - chart: weavelab/prometheus
+      - chart: weavelab/zookeeper
+      kube-system:
+      - chart: weavelab/traefik

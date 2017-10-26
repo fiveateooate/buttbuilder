@@ -4,8 +4,8 @@ import os
 import re
 
 import yaml
-from googleapiclient import discovery
-from oauth2client.client import GoogleCredentials
+#from googleapiclient import discovery
+#from oauth2client.client import GoogleCredentials
 
 import buttlib
 
@@ -59,27 +59,12 @@ class Builder(buttlib.common.ButtBuilder):
     """the gce type butt builder"""
 
     def __init__(self, env_info, args):
-        if 'GOOGLE_APPLICATION_CREDENTIALS' not in os.environ:
-            raise buttlib.common.MissingEnvVarsError(
-                "GOOGLE_APPLICATION_CREDENTIALS must be exported to env")
-        self._credentials = GoogleCredentials.get_application_default()
-        self.__gce_conn = discovery.build(
-            'compute', 'v1', credentials=self._credentials)
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
 
-        self.__ssl_helper = buttlib.helpers.SSLHelper(
-            self._env_info['clusterDomain'],
-            "{}/ssl".format(self._cluster_info['buttdir']),
-            bits=2048)
-        if 'network_name' not in self._cluster_info:
-            self._cluster_info['network_name'] = "net-{}".format(
-                self._cluster_info['cluster_name'])
-        self._cluster_info[
-            'master_lb_name'] = "lb-kube-master-{}-loadbal".format(
-                self._cluster_info['cluster_name'])
-        self._cluster_info[
-            'worker_lb_name'] = "lb-kube-worker-{}-loadbal".format(
-                self._cluster_info['cluster_name'])
+        self.client = buttlib.gce.client(project=self._env_info['project'], region=self._env_info['region'])
+        self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']), bits=2048)
+        self._cluster_info['master_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="master", cluster_name=self._cluster_info['cluster_name'])
+        self._cluster_info['worker_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="worker", cluster_name=self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
         self.__network_url = None
         self._cluster_info['master_ip'] = self._butt_ips.get_ip(2)
@@ -89,7 +74,9 @@ class Builder(buttlib.common.ButtBuilder):
         self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
         # setting butt provider to gce doesn't work out of the box need to figure out a buncha crap
         # enabling it make it do things like try to create load balancers and stuff and breaks scheduling
-        # self._cluster_info['cloud_provider'] = "gce"
+        self._cluster_info['cloud_provider'] = "gce"
+
+        # stupid fecking shit cause we have all this stupid fecking vpn crap
         if "network" in self._env_info:
             with open("butt-templates/stubs/gce_hosts.yaml", "r") as file:
                 self._cluster_info['hostsfile_tmpl'] = file.read()
@@ -97,13 +84,9 @@ class Builder(buttlib.common.ButtBuilder):
                 self._cluster_info['resolvconf'] = file.read()
 
     def __get_hostname(self, role, index):
-        hostname = "kube-worker-{cluster_name}-{suffix:02d}".format(
-            cluster_name=self._cluster_info['cluster_name'],
-            suffix=index+1)
+        hostname = "kube-worker-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index+1)
         if role == "masters":
-            hostname = "kube-master-{cluster_name}-{suffix:02d}".format(
-                cluster_name=self._cluster_info['cluster_name'],
-                suffix=index + 1)
+            hostname = "kube-master-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index + 1)
         return hostname
 
     def generate_vm_config(self, role, image, index, zone):
@@ -118,87 +101,65 @@ class Builder(buttlib.common.ButtBuilder):
         vm_tmp = {"hostname": hostname, "ip": ip_address}
         vm_info = copy.deepcopy(_CONFIG_TMPL)
         vm_info['name'] = vm_tmp["hostname"]
-        vm_info['machineType'] = "zones/{zone}/machineTypes/{type}".format(
-            zone=zone, type=self._env_info[role]['machineType'])
+        vm_info['machineType'] = "zones/{zone}/machineTypes/{type}".format(zone=zone, type=self._env_info[role]['machineType'])
         vm_info['disks'][0]['initializeParams']['sourceImage'] = image
-        vm_info['disks'][0]['initializeParams']['diskSizeGb'] = self._env_info[
-            role]['rootDiskSize']
+        vm_info['disks'][0]['initializeParams']['diskSizeGb'] = self._env_info[role]['rootDiskSize']
         vm_info['disks'][0]['initializeParams']['diskType'] = "zones/{}/diskTypes/pd-ssd".format(zone)
         vm_info['networkInterfaces'][0]['network'] = self.__network_url
         vm_info['networkInterfaces'][0]['networkIP'] = ip_address
-        vm_info['metadata']['items'][0]['value'] = self.get_user_data(
-            role, vm_tmp)
-        vm_info[
-            'additional_labels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(
-                self._env_info['region'], zone)
+        vm_info['metadata']['items'][0]['value'] = self.get_user_data(role, vm_tmp)
+        vm_info['additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(self._env_info['region'], zone)
         return vm_info
 
     def get_master_info(self):
         return [
-            {"hostname": "kube-master-%s-%02d" % (self._cluster_info['cluster_name'], i + 1), "ip": self._butt_ips.get_ip(self._cluster_info['ipOffsets']['masters'] +i)} for i in range(self._env_info['masters']['nodes'])
+            {"hostname": "kube-master-%s-%02d" % (self._cluster_info['cluster_name'], i + 1), "ip": self._butt_ips.get_ip(self._cluster_info['ipOffsets']['masters'] + i)} for i in range(self._env_info['masters']['nodes'])
         ]
 
     def get_master_ips(self):
-        return [self._butt_ips.get_ip(i + self._cluster_info['ipOffsets']['masters']) for i in range (self._env_info['masters']['nodes'])]
+        return [self._butt_ips.get_ip(i + self._cluster_info['ipOffsets']['masters']) for i in range(self._env_info['masters']['nodes'])]
 
     def __create_certs(self):
         buttlib.helpers.BColors().bcprint("Creating certs ...", "HEADER")
         master_ips = self.get_master_ips()
         master_ips.append(self._cluster_info['master_ip'])
-        self.__ssl_helper.createCerts(master_ips,
-                                      self._cluster_info["cluster_ip"],
-                                      self.get_master_hosts())
+        self.__ssl_helper.createCerts(master_ips, self._cluster_info["cluster_ip"], self.get_master_hosts())
         buttlib.helpers.BColors().bcprint("done", "OKBLUE")
 
     def __create_or_get_network(self):
+        network_url = ""
         buttlib.helpers.BColors().bcprint("Creating network ...", "HEADER")
-        if not self._args.dryrun and 'network' not in self._env_info:
-            self.__network_url = buttlib.gce.gce_network.create_network(
-                self.__gce_conn, self._cluster_info['network_name'],
-                self._env_info['externalNet'], self._env_info['project'])
-        elif not self._args.dryrun and 'network' in self._env_info:
-            self.__network_url = buttlib.gce.gce_network.get_network_url(
-                self.__gce_conn, self._cluster_info['network_name'],
-                self._env_info['project'])
+        network = buttlib.gce.networks.get(self.client, self._cluster_info['network_name'])
+        if network:
+            network_url = network['selfLink']
+        else:
+            if self._args.dryrun:
+                print("would have created network {}".format(self._cluster_info['network_name']))
+            else:
+                network_url = buttlib.gce.networks.create(self.client, self._cluster_info['network_name'], self._env_info['externalNet'])
         buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        return network_url
 
-    def __create_instance_groups(self, project, region, cluster_name, network):
+    def __create_or_get_instance_groups(self):
         """create a gce instance group"""
-        instance_groups = {}
-        buttlib.helpers.BColors().bcprint("Creating instance groups ...",
-                                          "HEADER")
-        if not self._args.dryrun:
-            instance_groups = {'masters': {}, 'workers': {}}
-            region_info = buttlib.gce.gce_common.get_region_info(
-                self.__gce_conn, project, region)
-            for zone in region_info['zones']:
-                zone_name = (zone.split("/")[-1]).strip()
-                name = "kube-masters-{cluster}-{zone}".format(
-                    cluster=cluster_name, zone=zone_name)
-                instance_groups['masters'][zone_name] = {
-                    "name":
-                    name,
-                    "url":
-                    buttlib.gce.gce_group.create_instance_group(
-                        self.__gce_conn, project, zone_name, name, network)
-                }
-                name = "kube-workers-{cluster}-{zone}".format(
-                    cluster=cluster_name, zone=zone_name)
-                instance_groups['workers'][zone_name] = {
-                    "name":
-                    name,
-                    "url":
-                    buttlib.gce.gce_group.create_instance_group(
-                        self.__gce_conn, project, zone_name, name, network)
-                }
+        instance_groups = {'masters': {}, 'workers': {}}
+        region_info = buttlib.gec.regions.get(self.client)
+        buttlib.helpers.BColors().bcprint("Creating instance groups ...", "HEADER")
+        # if not self._args.dryrun:
+        for zone in region_info['zones']:
+            zone_name = (zone.split("/")[-1]).strip()
+            master_name = "kube-masters-{cluster}-{zone}".format(cluster=self._cluster_info['cluster_name'], zone=zone_name)
+            instance_groups['masters'][zone_name] = {"name": master_name, "url": ""}
+            worker_name = "kube-workers-{cluster}-{zone}".format(cluster=self._cluster_info['cluster_name'], zone=zone_name)
+            instance_groups['workers'][zone_name] = {"name": worker_name, "url": ""}
+            if not self._args.dryrun:
+                instance_groups['masters'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, master_name, self.__network_url)
+                instance_groups['workers'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, worker_name, self.__network_url)
         buttlib.helpers.BColors().bcprint("done", "OKBLUE")
         return instance_groups
 
     def __create_internal_lb(self, lb_settings, instance_groups):
-        backend_url = buttlib.gce.gce_network.create_internal_backend_service(
-            self.__gce_conn, self._env_info['project'],
-            self._env_info['region'], lb_settings['name'], instance_groups,
-            lb_settings['hcport'])
+        backend_url = buttlib.gce.gce_network.create_internal_backend_service(self.__gce_conn, self._env_info['project'], self._env_info['region'], lb_settings['name'], instance_groups, lb_settings['hcport'])
         buttlib.gce.gce_network.create_forwarding_rule(
             self.__gce_conn,
             self._env_info['project'],
@@ -228,7 +189,7 @@ class Builder(buttlib.common.ButtBuilder):
                 "name": self._cluster_info['master_lb_name'],
                 "proto": "tcp",
                 "hcport": "443",
-                "lbports": [443,2379,8080],
+                "lbports": [443, 2379, 8080],
                 "ip": self._cluster_info['master_ip']
             }
             self.__create_internal_lb(lb_settings, instance_groups['masters'])
@@ -325,35 +286,41 @@ class Builder(buttlib.common.ButtBuilder):
             for index, master in enumerate(self.get_master_info())
         ])
 
+    def add_node(self, args):
+        pass
+        # get an ip
+        # create a config?
+        # create vm
+        # return operation
+
     def build(self):
         """create the butt"""
         instances = []
         operations = []
-        image = self.get_image()
-        region_info = buttlib.gce.gce_common.get_region_info(
-            self.__gce_conn, self._env_info['project'],
-            self._env_info['region'])
+        image = buttlib.gce.images.getFromFamily(self.client)
+        region_info = buttlib.gce.regions.get(self.client)
         num_zones = len(region_info['zones'])
         self.__create_certs()
-        self.__create_or_get_network()
-        instance_groups = self.__create_instance_groups(
-            self._env_info['project'], self._env_info['region'],
-            self._cluster_info['cluster_name'], self.__network_url)
+        self.__network_url = self.__create_or_get_network()
+        instance_groups = self.__create_instance_groups()
         self.__create_load_balancers(instance_groups)
         for i in range(self._env_info['masters']['nodes']):
             zone = region_info['zones'][i % num_zones]
             zone_name = (zone.split("/")[-1]).strip()
-            vm_config = self.generate_vm_config("masters", image, i, zone_name)
+            vm_config = self.generate_vm_config("masters", image['selfLink'], i, zone_name)
             if self._args.verbose:
                 print(vm_config)
             operations.append((self.__create_vm(zone_name, vm_config)))
         for i in range(self._env_info['workers']['nodes']):
-            zone = region_info['zones'][i % num_zones]
-            zone_name = (zone.split("/")[-1]).strip()
-            vm_config = self.generate_vm_config("workers", image, i, zone_name)
-            if self._args.verbose:
-                print(vm_config)
-            operations.append((self.__create_vm(zone_name, vm_config)))
+            # TODO: change this to add node
+            # operation = add_node(config, whateverotherstuff)
+            pass
+            # zone = region_info['zones'][i % num_zones]
+            # zone_name = (zone.split("/")[-1]).strip()
+            # vm_config = self.generate_vm_config("workers", image['selfLink'], i, zone_name)
+            # if self._args.verbose:
+            #     print(vm_config)
+            # operations.append((self.__create_vm(zone_name, vm_config)))
         if not self._args.dryrun:
             for operation in operations:
                 result = buttlib.gce.gce_common.wait_for_zone_operation(
@@ -412,36 +379,6 @@ class Builder(buttlib.common.ButtBuilder):
     def get_kube_masters(self):
         """:returns: string"""
         return "https://{ip}".format(ip=self._cluster_info['master_ip'])
-
-    def get_image(self):
-        """:returns: string gce image link for coreos"""
-        images = self.__gce_conn.images( #pylint:disable=E1101
-        ).getFromFamily(
-            project="coreos-cloud",
-            family="coreos-%s" % self._env_info['coreosChannel']).execute()
-        return images['selfLink']
-
-    def list_networks(self):
-        """:returns: list - list of gce networks"""
-        buttlib.gce.gce_network.list_networks(self.__gce_conn,
-                                              self._env_info['project'])
-
-    def create_network(self):
-        """creates a new gce network"""
-        buttlib.gce.gce_network.create_network(
-            self.__gce_conn, self._cluster_info['network_name'],
-            self._env_info['externalNet'], self._env_info['project'])
-
-    def delete_network(self):
-        """delete a network from gce"""
-        buttlib.gce.gce_network.delete_network(
-            self.__gce_conn, self._cluster_info['network_name'],
-            self._env_info['project'])
-
-    # def create_load_balancer(self, name, project, region, port, proto):
-    #     pass
-    #     #gce_network.create_target_pool(self.__gce_conn, name, project, region, port)
-    #     #gce_network.create_forwarding_rule(self.__gce_conn, name, proto, port, self._cluster_info['master_lb_name'], project, region)
 
     def create_forwarding_rule(self, portrange="443", proto="TCP"):
         """create a gce forwarding rule"""

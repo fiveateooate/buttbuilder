@@ -1,0 +1,52 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/addons/thedefiler.yaml"
+  mode: 0644
+  contents:
+    inline: |
+      apiVersion: extensions/v1beta1
+      kind: Deployment
+      metadata:
+        name: thedefiler
+        namespace: kube-system
+        labels:
+          kubernetes.io/cluster-service: "true"
+      spec:
+        template:
+          metadata:
+            labels:
+              app: thedefiler
+          spec:
+            imagePullSecrets:
+            - name: jenkins-docker-key
+            containers:
+            - name: thedefiler
+              image: weavelab/ops-thedefiler:v0.3.0
+              imagePullPolicy: Always
+              env:
+              - name: ETCDHOST
+                value: "{kube_master}"
+              - name: CLUSTER_ENV
+                valueFrom:
+                  configMapKeyRef:
+                    name: cluster-env
+                    key: cluster-env
+              - name: CLUSTER_ID
+                valueFrom:
+                  configMapKeyRef:
+                    name: cluster-env
+                    key: cluster-id
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: defilerversioner
+        namespace: kube-system
+      spec:
+        ports:
+        - port: 9656
+          protocol: TCP
+          targetPort: 9656
+          nodePort: 30656
+        selector:
+          app: thedefiler
+        type: NodePort

@@ -1,0 +1,6 @@
+- filesystem: "root"
+  path:       "/etc/sysctl.d/max_map_count.conf"
+  mode:       0644
+  contents:
+    inline: |
+      vm.max_map_count=262144

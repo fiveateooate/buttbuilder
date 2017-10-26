@@ -1,0 +1,2 @@
+flags:
+- --log-opt max-size=10k

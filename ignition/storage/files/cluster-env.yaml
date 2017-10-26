@@ -1,0 +1,15 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/addons/cluster-env.yaml"
+  mode: 0644
+  contents:
+    inline: |
+      apiVersion: v1
+      data:
+        cluster-env: {cluster_env}
+        cluster-id: {cluster_id}
+      kind: ConfigMap
+      metadata:
+        name: cluster-env
+        namespace: kube-system
+        labels:
+          kubernetes.io/cluster-service: "true"

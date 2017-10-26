@@ -22,5 +22,5 @@ class SSHKeyHelper():
         """:returns: pub keys in string formatted for user_data"""
         pub_key_str = ""
         for pub_key in self.__ssh_pub_keys:
-            pub_key_str += " - {pub_key}".format(pub_key=pub_key)
+            pub_key_str += "    - {pub_key}".format(pub_key=pub_key)
         return pub_key_str

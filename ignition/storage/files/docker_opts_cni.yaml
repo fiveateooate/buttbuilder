@@ -1,0 +1,7 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/cni/docker_opts_cni.env"
+  mode: 0644
+  contents:
+    inline: |
+      DOCKER_OPT_BIP=""
+      DOCKER_OPT_IPMASQ=""

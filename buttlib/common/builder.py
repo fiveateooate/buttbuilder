@@ -12,13 +12,18 @@ import string
 import subprocess
 import hashlib
 
-from sh import kubectl  # pylint:disable=E0611
+from sh import kubectl
 
 import buttlib
 
 
 class ButtBuilder(object):
     """base class set up parameters needed by all butt builders"""
+
+    LB_NAME_TMPLT = "lb-kube-{type}-{cluster_name}-loadbal"
+    MASTER_NAME_TMPLT = "kube-master-{cluster_name}-{suffix:02d}"
+    WORKER_NAME_TMPLT = "kube-worker-{cluster_name}-{suffix}"
+    NETWORK_NAME_TMPLT = "net-{cluster_name}"
 
     def __init__(self, env_info, args):
         self._env_info = env_info
@@ -40,17 +45,17 @@ class ButtBuilder(object):
             "cluster_env": args.cluster_env,
             "cluster_id": args.cluster_id,
             "cloud_provider": "",
+            "buttProvider": "",
             "network_config": "",
             "cluster_name": "{}-{}".format(self._args.cluster_env, self._args.cluster_id),
             "dns_ip": self._cluster_internal_ips.get_ip(5),
             "master_ip": self._butt_ips.get_ip(self._master_ip_offset),
-            "kube_master": self._butt_ips.get_ip(self._master_ip_offset), # wtf?
+            "kube_master": self._butt_ips.get_ip(self._master_ip_offset),  # wtf?
             "master_port": 443,
             "cluster_ip": self._cluster_internal_ips.get_ip(1),
             "ssh_pub_keys": __ssh_pub_key_helper.get_pub_keys(),
-            "optional_hostname_override": "",
-            "master_count": env_info['masters']['nodes'],
-            "additional_labels": "",
+            "optionalHostnameOverride": "",
+            "additionalLabels": "",
             "nameserver_config": "",
             "hostsfile": "",
             "resolvconf": "",
@@ -61,23 +66,22 @@ class ButtBuilder(object):
                 "masters": 10,
                 "workers": 30
             },
-            "etcd_version": "v3.2.5",
+            "etcdVersion": "3.2.9",
         }
         # these need cluster_name to be set first
         self._cluster_info["etcd_hosts"] = self.get_etcd_hosts()
         self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
         self._cluster_info["kube_masters"] = self.get_kube_masters()
-        self._cluster_info["kube_addons"] = self.get_kube_addons()
-        self._cluster_info["kube_manifests"] = self.get_kube_manifests()
-        self._cluster_info["buttdir"] = "%s/%s" % (os.path.expanduser("~"), self._cluster_info['cluster_name'])
-        self._cluster_info["user_data_tmpl"] = {
-            "master": self.__read_ud_template("master"),
-            "worker": self.__read_ud_template("worker")
-        }
+        self._cluster_info["etcdEndpoints"] = self.get_etcd_endpoints()
+        if args.buttdir is not None:
+            self._cluster_info["buttdir"] = "{}/{}".format(args.buttdir, self._cluster_info['cluster_name'])
+        else:
+            self._cluster_info["buttdir"] = "{}/{}".format(os.path.expanduser("~"), self._cluster_info['cluster_name'])
         self._cluster_info["etcd_initial_cluster_token"] = hashlib.sha256(self._cluster_info["etcd_initial_cluster"].encode()).hexdigest()
         if 'network' in self._env_info and 'networkName' in self._env_info['network']:
             self._cluster_info['network_name'] = self._env_info['network']['networkName']
-
+        else:
+            self._cluster_info['network_name'] = ButtBuilder.CLUSTER_NAME_TMPLT.format(cluster_name=self._cluster_info['cluster_name'])
         if not os.path.exists(self._cluster_info['buttdir']):
             os.makedirs(self._cluster_info['buttdir'])
 
@@ -93,6 +97,11 @@ class ButtBuilder(object):
         """:returns: list - k8s api endpoints"""
         return ','.join(
             ["https://%s" % (master) for master in self.get_master_hosts()])
+
+    def get_etcd_endpoints(self):
+        """:returns: list - etcd endpoints without http:// fo ruse by gateway"""
+        return ','.join(
+            ["%s:2379" % (master) for master in self.get_master_hosts()])
 
     def get_master_hosts(self):
         """:returns: list - master host names"""

@@ -1,0 +1,42 @@
+- name: kubelet.service
+  enable: true
+  contents: |
+    [Unit]
+    Description=kubelet service
+    [Service]
+    Environment=KUBELET_IMAGE_TAG={kubeletVersion}
+    Environment="RKT_RUN_ARGS=--uuid-file-save=/var/run/kubelet-pod.uuid \
+      --volume var-log,kind=host,source=/var/log \
+      --mount volume=var-log,target=/var/log \
+      --volume dns,kind=host,source=/etc/resolv.conf \
+      --mount volume=dns,target=/etc/resolv.conf \
+      --volume etc-hosts,kind=host,source=/etc/hosts \
+      --mount volume=etc-hosts,target=/etc/hosts"
+
+
+    ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
+    ExecStartPre=/usr/bin/mkdir -p /var/log/containers
+    ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
+
+    ExecStart=/usr/lib/coreos/kubelet-wrapper {optionalHostnameOverride} \
+      --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
+      --require-kubeconfig \
+      {kubeletRegistration} \
+      --cni-conf-dir=/etc/kubernetes/cni/net.d \
+      --network-plugin=cni \
+      --container-runtime=docker \
+      --allow-privileged=true \
+      --pod-manifest-path=/etc/kubernetes/manifests \
+      --cluster-dns={dns_ip} \
+      --cluster-domain={clusterDomain} \
+      --tls-cert-file=/etc/kubernetes/ssl/{hostname}.pem \
+      --tls-private-key-file=/etc/kubernetes/ssl/{hostname}-key.pem \
+      --node-labels=cluster-role={clusterRole}{additionalLabels} \
+      --cloud-provider={buttProvider}
+
+    ExecStop=-/usr/bin/rkt stop --uuid-file=/var/run/kubelet-pod.uuid
+    Restart=always
+    RestartSec=10
+
+    [Install]
+    WantedBy=multi-user.target

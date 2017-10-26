@@ -232,7 +232,7 @@ class Builder(buttlib.common.ButtBuilder):
             },
             "host_pem": self.__ssl_helper.getInfo()["%s_pem" % vm['hostname']],
             "host_key": self.__ssl_helper.getInfo()["%s_key" % vm['hostname']],
-            'optional_hostname_override': "--hostname-override=%s" % vm['ip']
+            'optionalHostnameOverride': "--hostname-override=%s" % vm['ip']
         }
         netcfg = {
             'network_config': self.__network_config % {

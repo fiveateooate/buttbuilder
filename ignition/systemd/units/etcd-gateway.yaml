@@ -1,0 +1,11 @@
+- name: etcd-member.service
+  enable: true
+  dropins:
+  - name: "50-etcd-gateway-config.conf"
+    contents: |
+      [Unit]
+      Wants=network-online.target
+      [Service]
+      Environment="ETCD_IMAGE_TAG=v{etcdVersion}"
+      ExecStart=
+      ExecStart=/usr/lib/coreos/etcd-wrapper $ETCD_OPTS gateway start --listen-addr=0.0.0.0:2379 --endpoints={etcdEndpoints}

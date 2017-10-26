@@ -1,0 +1,12 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/cni/net.d/10-flannel.conf"
+  mode: 0644
+  contents:
+    inline: |
+      {{
+        "name": "podnet",
+        "type": "flannel",
+        "delegate": {{
+          "isDefaultGateway": true
+        }}
+      }}

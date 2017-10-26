@@ -10,7 +10,7 @@ class SSLHelper():
         self.__bits = bits
         self.__ssl_dir = ssl_dir
         self.__ssl_info = {}
-        self.__indent_string = "      "
+        self.__indent_string = "{:8}".format("")
         self.load_or_create_ca()
 
     def load_or_create_ca(self):
@@ -35,12 +35,13 @@ class SSLHelper():
     def add_formatted_key_to_ssl_dict(self, name, key):
         self.__ssl_info[name] = textwrap.indent(
             OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM,
-                                           key).decode(),
-            self.__indent_string)
+                                           key).decode(), self.__indent_string)
 
     def add_formatted_cert_to_ssl_dict(self, name, cert):
         self.__ssl_info[name] = textwrap.indent(
-            OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert).decode(), self.__indent_string)
+            OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM,
+                                            cert).decode(),
+            self.__indent_string)
 
     def getInfo(self):
         return self.__ssl_info
@@ -117,8 +118,8 @@ class SSLHelper():
                                          san_list.encode('utf-8'))
         ])
         self.signCert(host_cert, host_key)
-        self.add_formatted_cert_to_ssl_dict("%s_pem" % hostname, host_cert)
-        self.add_formatted_key_to_ssl_dict("%s_key" % hostname, host_key)
+        self.add_formatted_cert_to_ssl_dict("{}_pem".format(hostname), host_cert)
+        self.add_formatted_key_to_ssl_dict("{}_key".format(hostname), host_key)
         self.writeFiles(host_cert, host_key, hostname)
 
     def generateHostName(self, hostname):

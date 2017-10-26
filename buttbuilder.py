@@ -68,6 +68,7 @@ if __name__ == '__main__':
         '--cluster_config_path',
         help="path to cluster_config file if github is not working",
         default=None)
+    parser.add_argument('--buttdir', help="directory to store cluster data")
     # operations
     subparsers = parser.add_subparsers(
         title="buttbuilder operations", help='do things with butts')

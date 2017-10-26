@@ -1,0 +1,10 @@
+- name: "docker.service"
+  enable: true
+  dropins:
+  - name: "50-flannel-config.conf"
+    contents: |
+      [Unit]
+      Requires=flanneld.service
+      After=flanneld.service
+      [Service]
+      EnvironmentFile=/etc/kubernetes/cni/docker_opts_cni.env

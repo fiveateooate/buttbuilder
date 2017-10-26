@@ -1,0 +1,7 @@
+- name: "update-ca-certificates.service"
+  enable: true
+  dropins:
+  - name: "00-rmsymlink.conf"
+    contents: |
+      [Unit]
+      ConditionPathIsSymbolicLink=

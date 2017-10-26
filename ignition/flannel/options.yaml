@@ -1,0 +1,3 @@
+interface: {ip}
+etcd_endpoints: {etcd_hosts}
+ip_masq: true

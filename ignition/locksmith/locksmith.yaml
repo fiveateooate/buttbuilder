@@ -1,0 +1,3 @@
+reboot_strategy: "etcd-lock"
+window_start:    "Sun 1:00"
+window_length:   "2h"

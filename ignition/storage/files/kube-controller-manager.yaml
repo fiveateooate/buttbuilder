@@ -1,0 +1,43 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/manifests/kube-controller-manager.yaml"
+  mode: 0644
+  contents:
+    inline: |
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: kube-controller-manager
+        namespace: kube-system
+      spec:
+        hostNetwork: true
+        containers:
+        - name: kube-controller-manager
+          image: quay.io/coreos/hyperkube:{kubeletVersion}
+          command:
+          - /hyperkube
+          - controller-manager
+          - --kubeconfig=/etc/kubernetes/kubeconfig.yaml
+          - --service-account-private-key-file=/etc/kubernetes/ssl/apiserver-key.pem
+          - --root-ca-file=/etc/kubernetes/ssl/ca.pem
+          - --cloud-provider={buttProvider}
+          livenessProbe:
+            httpGet:
+              host: 127.0.0.1
+              path: /healthz
+              port: 10252
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          volumeMounts:
+            - mountPath: /etc/kubernetes/kubeconfig.yaml
+              name: "kubeconfig"
+              readOnly: true
+            - mountPath: /etc/kubernetes/ssl
+              name: "etc-kubernetes-ssl"
+              readOnly: true
+        volumes:
+          - name: "kubeconfig"
+            hostPath:
+              path: "/etc/kubernetes/kubeconfig.yaml"
+          - name: "etc-kubernetes-ssl"
+            hostPath:
+              path: "/etc/kubernetes/ssl"

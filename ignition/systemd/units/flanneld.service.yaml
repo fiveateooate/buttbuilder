@@ -1,0 +1,7 @@
+- name: "flanneld.service"
+  enable: true
+  dropins:
+  - name: "50-flannel-network-config.conf"
+    contents: |
+      [Service]
+      ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{{ "Network": "172.16.0.0/12" ,"Backend": {{ "Type": "vxlan" }}}}'
