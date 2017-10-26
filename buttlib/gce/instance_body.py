@@ -29,7 +29,7 @@ class InstanceBody(object):
         }]
         self.networkInterfaces = [{
             "network": "",
-            "name": "interface0"
+            "name": "interface0",
             "accessConfigs": [{
                 "kind": "compute#accessConfig",
                 "type": "ONE_TO_ONE_NAT",

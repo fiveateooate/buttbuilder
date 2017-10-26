@@ -4,7 +4,7 @@ Uses yaml configuration file to create and configure a kubernetes cluster. Avail
 
 
 * switching to ignition is  work in progreess, see the ignitionswitch branch
-* readme somewhat out of default-cluster
+* readme somewhat out of date
 
 ## Setup
 ### osx Dependencies
