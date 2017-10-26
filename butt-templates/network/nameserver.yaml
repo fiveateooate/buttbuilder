@@ -1,0 +1,6 @@
+    - name: 00-netconfig.network
+      content: |
+        [Network]
+        DHCP=yes
+        DNS=%(host_dns)s
+        Domains=%(search_domains)s

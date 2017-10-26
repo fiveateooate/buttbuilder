@@ -1,0 +1,7 @@
+- path: /etc/resolv.conf
+  permissions: "0644"
+  owner: "root"
+  content: |
+    nameserver %(nameServer)s
+    nameserver 169.254.169.254
+    search %(searchDomain)s

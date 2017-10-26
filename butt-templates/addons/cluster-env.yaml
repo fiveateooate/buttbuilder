@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  cluster-env: %(cluster_env)s
+  cluster-id: %(cluster_id)s
+kind: ConfigMap
+metadata:
+  name: cluster-env
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"

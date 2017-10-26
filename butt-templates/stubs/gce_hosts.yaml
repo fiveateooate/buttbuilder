@@ -1,0 +1,6 @@
+- path: /etc/hosts
+  permissions: "0644"
+  owner: "root"
+  content: |
+    169.254.169.254 metadata metadata.google.internal
+    127.0.0.1 %(hostname)s  %(hostname)s.%(domains)s

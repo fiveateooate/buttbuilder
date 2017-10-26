@@ -1,0 +1,12 @@
+    - name: 00-%(device)s.network
+      runtime: true
+      content: |
+        [Match]
+        Name=%(device)s
+
+        [Network]
+        DNS=%(host_dns)s
+        Address=%(ip_with_cidr)s
+        Gateway=%(network_gateway)s
+    - name:  systemd-networkd.service
+      command: restart

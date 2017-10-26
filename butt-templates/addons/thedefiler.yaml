@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: thedefiler
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+spec:
+  template:
+    metadata:
+      labels:
+        app: thedefiler
+    spec:
+      imagePullSecrets:
+      - name: {secret}
+      containers:
+      - name: thedefiler
+        image: {image}
+        imagePullPolicy: Always
+        env:
+        - name: ETCDHOST
+          value: "%(master_ip)s"
+        - name: CLUSTER_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-env
+              key: cluster-env
+        - name: CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-env
+              key: cluster-id
