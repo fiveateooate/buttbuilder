@@ -4,8 +4,8 @@ import os
 import re
 
 import yaml
-#from googleapiclient import discovery
-#from oauth2client.client import GoogleCredentials
+# from googleapiclient import discovery
+# from oauth2client.client import GoogleCredentials
 
 import buttlib
 
@@ -173,17 +173,11 @@ class Builder(buttlib.common.ButtBuilder):
             ip=lb_settings['ip'])
 
     def __create_external_lb(self, lb_settings):
-        backend_url = buttlib.gce.gce_network.create_target_pool(
-            self.__gce_conn, lb_settings['name'], self._env_info['project'],
-            self._env_info['region'], lb_settings['hcport'])
-        buttlib.gce.gce_network.create_forwarding_rule(
-            self.__gce_conn, self._env_info['project'],
-            self._env_info['region'], lb_settings['name'], backend_url,
-            lb_settings['schema'], lb_settings['lbports'])
+        backend_url = buttlib.gce.gce_network.create_target_pool(self.__gce_conn, lb_settings['name'], self._env_info['project'], self._env_info['region'], lb_settings['hcport'])
+        buttlib.gce.gce_network.create_forwarding_rule(self.__gce_conn, self._env_info['project'], self._env_info['region'], lb_settings['name'], backend_url, lb_settings['schema'], lb_settings['lbports'])
 
     def __create_load_balancers(self, instance_groups):
-        buttlib.helpers.BColors().bcprint("Creating load balancers ...",
-                                          "HEADER")
+        buttlib.helpers.BColors().bcprint("Creating load balancers ...", "HEADER")
         if not self._args.dryrun:
             lb_settings = {
                 "name": self._cluster_info['master_lb_name'],
@@ -215,15 +209,9 @@ class Builder(buttlib.common.ButtBuilder):
 
     def __create_vm(self, zone, vm_config):
         operation = ""
-        buttlib.helpers.BColors().bcprint(
-            "Creating VM {} ... ".format(vm_config['name']), "HEADER")
+        buttlib.helpers.BColors().bcprint("Creating VM {} ... ".format(vm_config['name']), "HEADER")
         if not self._args.dryrun:
-            operation = (
-                self.__gce_conn.instances().insert(  #pylint:disable=E1101
-                    project=self._env_info['project'],
-                    zone=zone,
-                    body=vm_config).execute(),
-                zone)
+            operation = (self.__gce_conn.instances().insert(project=self._env_info['project'], zone=zone, body=vm_config).execute(), zone)
         buttlib.helpers.BColors().bcprint("done", "OKBLUE")
         return operation
 
@@ -237,9 +225,7 @@ class Builder(buttlib.common.ButtBuilder):
                     group = instance_groups['masters'][zone]['name']
                 else:
                     group = instance_groups['workers'][zone]['name']
-                buttlib.gce.gce_group.add_instance_to_group(
-                    self.__gce_conn, self._env_info['project'], zone, group,
-                    instance['targetLink'])
+                buttlib.gce.gce_group.add_instance_to_group(self.__gce_conn, self._env_info['project'], zone, group, instance['targetLink'])
         buttlib.helpers.BColors().bcprint("done", "OKBLUE")
 
     def __add_to_target_pool(self, instances):
@@ -323,9 +309,7 @@ class Builder(buttlib.common.ButtBuilder):
             # operations.append((self.__create_vm(zone_name, vm_config)))
         if not self._args.dryrun:
             for operation in operations:
-                result = buttlib.gce.gce_common.wait_for_zone_operation(
-                    self.__gce_conn, self._env_info['project'], operation[1],
-                    operation[0]['name'])
+                result = buttlib.gce.gce_common.wait_for_zone_operation(self.__gce_conn, self._env_info['project'], operation[1], operation[0]['name'])
                 if self._args.verbose:
                     print(result)
                 instances.append(result)

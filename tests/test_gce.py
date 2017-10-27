@@ -75,6 +75,12 @@ class TestGCE():
         print(result)
         assert isinstance(result, dict) and result['kind'] == 'compute#subnetwork' and result['ipCidrRange'] == '10.254.0.0/24'
 
+    def test_gce_subnetworks_get(self):
+        """Test buttlib.gce.subnetworks.get()"""
+        result = buttlib.gce.subnetworks.get(self.client, self.args['test_subnetwork_name'])
+        print(result)
+        assert isinstance(result, dict) and result['kind'] == 'compute#subnetwork' and result['name'] == self.args['test_subnetwork_name']
+
     # tests for gce.instanceGroups
     def test_gce_instance_groups_list(self):
         """Test buttlib.gce.instance_groups.list()"""
@@ -114,6 +120,19 @@ class TestGCE():
         result = buttlib.gce.instances.get(self.client, self.args['test_instance_name'])
         print(result)
         assert isinstance(result, dict) and result == {}
+
+    # tests for instances
+    def test_gce_create_instance(self):
+        image = buttlib.gce.images.getFromFamily(self.client)
+        subnetwork = buttlib.gce.subnetworks.get(self.client, self.args['test_subnetwork_name'])
+        ib = buttlib.gce.InstanceBody()
+        ib.name = self.args["test_instance_name"]
+        ib.machineType = self.args['masters']['machineType']
+        ib.set_interface(subnetwork['selfLink'], "1.2.3.4")
+        ib.set_disk(image['selfLink'])
+        print(image)
+        print(subnetwork)
+        print(ib.json())
 
     # clean up
     def test_gce_instance_groups_delete(self):
