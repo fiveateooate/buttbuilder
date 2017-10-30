@@ -8,7 +8,7 @@ import ipaddress
 
 class TestButtIPs():
     def setup(self):
-        with open("tests/cluster.yaml") as fd:
+        with open("tests/cluster-gce.yaml") as fd:
             args = yaml.load(fd.read())
         self.args = args['noenv:buttbuildertest']
         self.butt_ips = buttlib.common.ButtIps(network=self.args['externalNet'])

@@ -1,0 +1,36 @@
+noenv:buttbuildertest:
+  clusterDomain: cluster.local
+  kubeletVersion: v1.8.2_coreos.0
+  externalNet: "192.168.69.0/24"
+  clusterNet: "192.168.70.0/24"
+  coreosChannel: stable
+  libvirtURI: "qemu:///system"
+  masters:
+    ipOffset: 10
+    nodes: 2
+    ram: 1024
+    cpus: 1
+    disk: 9
+  workers:
+    ipOffset: 30
+    nodes: 2
+    ram: 4196
+    cpus: 2
+    disk: 26
+  provider: libvirt
+  current_versions_file: dev/versions.yaml
+  services:
+    namespaces:
+      ops:
+      - chart: mychartrepo/alertmanager
+      #- chart: mychartrepo/elasticsearch
+      - chart: mychartrepo/fluentd
+      - chart: mychartrepo/grafana
+      #- chart: mychartrepo/kibana
+      - chart: mychartrepo/node-exporter
+      - chart: mychartrepo/prometheus
+      #- chart: mychartrepo/cleandorker
+      - chart: mychartrepo/etcd3
+      - chart: mychartrepo/postgresql-internal
+      kube-system:
+      - chart: mychartrepo/traefik

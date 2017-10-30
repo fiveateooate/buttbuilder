@@ -12,7 +12,7 @@ class TestGCE():
 
     def setup_class(self):
         print("Setup")
-        with open("tests/cluster.yaml") as fd:
+        with open("tests/cluster-gce.yaml") as fd:
             args = yaml.load(fd.read())
         self.args = args[TestGCE.TEST_CLUSTER_KEY]
         self.args['test_subnetwork_url'] = "https://www.googleapis.com/compute/v1/projects/weave-lab/regions/us-central1/subnetworks/buttbuildertest-subnet-xzhmmlp603-01"

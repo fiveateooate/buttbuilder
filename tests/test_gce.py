@@ -13,7 +13,7 @@ class TestGCE():
 
     def setup_class(self):
         print("Setup")
-        with open("tests/cluster.yaml") as fd:
+        with open("tests/cluster-gce.yaml") as fd:
             args = yaml.load(fd.read())
         self.args = args[TestGCE.TEST_CLUSTER_KEY]
         self.client = buttlib.gce.GCEClient(region=self.args['region'], project=self.args['project'])

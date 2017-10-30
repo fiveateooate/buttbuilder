@@ -6,16 +6,14 @@ import stat
 import random
 import subprocess
 import tempfile
-
 import libvirt
 import yaml
-
 import buttlib
 
 
 class Builder(buttlib.common.ButtBuilder):
     """ Libvrit module for buttbuilder """
-    __LIBVIRT_CREATE_TMPLT__ = """virt-install --connect {libvirt_host} \
+    __LIBVIRT_CREATE_TMPLT__ = """virt-install --connect {libvirt_uri} \
 --import \
 --name {hostname} \
 --ram {ram} \
@@ -43,16 +41,11 @@ class Builder(buttlib.common.ButtBuilder):
     def __init__(self, env_info, args):
         print("NOTE: sudo will be used to interact with libvirt")
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
-        self.__libvirt_host = env_info['libvirtHost']
+        self.__libvirt_uri = env_info['libvirtURI']
         self.__buttpool = "%s-pool" % (self._cluster_info['cluster_name'])
         self.__buttnet = "%s-net" % (self._cluster_info['cluster_name'])
-        self.__ssl_helper = buttlib.helpers.SSLHelper(
-            self._env_info['clusterDomain'],
-            "{}/ssl".format(self._cluster_info['buttdir']))
-        self.__libvirt_conn = libvirt.open(self.__libvirt_host)
-        if self.__libvirt_conn is None:
-            raise buttlib.common.LibVirtConnectionError(
-                "Failed to connect to {}".format(self.__libvirt_host))
+        self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']))
+        self.__client = buttlib.libvirt.LibvirtClient(self.__libvirt_uri)
 
     def build(self):
         """Gathers up config and calls various functions to create a kubernetes cluster"""
@@ -95,7 +88,7 @@ class Builder(buttlib.common.ButtBuilder):
             "butt_net": self.__buttnet,
             "butt_dir": self._cluster_info['buttdir'],
             "ram": self._env_info['masters']['ram'],
-            "libvirt_host": self.__libvirt_host,
+            "libvirt_uri": self.__libvirt_uri,
             "cpus": self._env_info['masters']['cpus'],
             "kubeletRegistration": "--register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule",
             "clusterRole": "master",
@@ -128,7 +121,7 @@ class Builder(buttlib.common.ButtBuilder):
             "butt_net": self.__buttnet,
             "butt_dir": self._cluster_info['buttdir'],
             "ram": self._env_info['workers']['ram'],
-            "libvirt_host": self.__libvirt_host,
+            "libvirt_uri": self.__libvirt_uri,
             "cpus": self._env_info['workers']['cpus'],
             "kubeletRegistration": "--register-node=true",
             "clusterRole": "worker",
@@ -268,7 +261,7 @@ class Builder(buttlib.common.ButtBuilder):
     def create_butt_pool(self):
         """ create a libvirt storage pool"""
         try:
-            self.__libvirt_conn.storagePoolLookupByName(self.__buttpool)
+            self.__client.connection.storagePoolLookupByName(self.__buttpool)
             print("Storage pool exists")
         except libvirt.libvirtError:
             print("Creating storage pool %s" % self.__buttpool)
@@ -288,7 +281,7 @@ class Builder(buttlib.common.ButtBuilder):
                     ],
                     stdout=subprocess.PIPE,
                     universal_newlines=True)
-                storage_pool = self.__libvirt_conn.storagePoolLookupByName(
+                storage_pool = self.__client.connection.storagePoolLookupByName(
                     self.__buttpool)
                 storage_pool.setAutostart(1)
                 print("Storage pool created")
@@ -296,10 +289,10 @@ class Builder(buttlib.common.ButtBuilder):
     def create_butt_network(self, __vm_initial_configs):
         """ create libvirt network including dhcp setup"""
         if [
-                net for net in self.__libvirt_conn.listNetworks()
+                net for net in self.__client.connection.listNetworks()
                 if net == self.__buttnet
         ] != []:
-            # network = self.__libvirt_conn.networkLookupByName(self.__buttnet)
+            # network = self.__client.connection.networkLookupByName(self.__buttnet)
             print("Destroying Network")
             subprocess.run(
                 ["sudo", "virsh", "net-destroy",
@@ -347,7 +340,7 @@ class Builder(buttlib.common.ButtBuilder):
 
     def get_next_hostname(self):
         """ figure out the next hostname from what is running"""
-        for domain in self.__libvirt_conn.listAllDomains():
+        for domain in self.__client.connection.listAllDomains():
             print(domain.name())
 
     def add_node(self):

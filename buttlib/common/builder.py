@@ -25,11 +25,9 @@ class ButtBuilder(object):
     WORKER_NAME_TMPLT = "kube-worker-{cluster_name}-{suffix}"
     NETWORK_NAME_TMPLT = "net-{cluster_name}"
 
-    def __init__(self, env_info, args):
+    def __init__(self, env_info, args, use_ips=False):
         self._env_info = env_info
         self._args = args
-        self._master_ip_offset = 10
-        self._worker_ip_offset = 30
         __ssh_pub_key_helper = buttlib.helpers.SSHKeyHelper()
         __subnet_mask = 24
         __subnet_offset = 0
@@ -38,8 +36,14 @@ class ButtBuilder(object):
                 __subnet_mask = self._env_info['network']['subnetMask']
             if 'subnetOffset' in self._env_info['network']:
                 __subnet_offset = self._env_info['network']['subnetOffset']
+        self.__cluster_name = "{}-{}".format(self._args.cluster_env, self._args.cluster_id)
         self._butt_ips = buttlib.common.ButtIps(network=self._env_info['externalNet'], subnet_mask=__subnet_mask, subnet_offset=__subnet_offset)
         self._cluster_internal_ips = buttlib.common.ButtIps(network=self._env_info['clusterNet'])
+        self._kube_masters = buttlib.common.KubeMasters(count=args['masters']['nodes'],
+                                                        cluster_name=self.__cluster_name,
+                                                        butt_ips=self._butt_ips,
+                                                        ip_offset=args['masters']['ipOffset'],
+                                                        use_ips=use_ips)
         # huge dict for convience in passing values to user_data
         self._cluster_info = {
             "cluster_env": args.cluster_env,
@@ -47,32 +51,28 @@ class ButtBuilder(object):
             "cloud_provider": "",
             "buttProvider": "",
             "network_config": "",
-            "cluster_name": "{}-{}".format(self._args.cluster_env, self._args.cluster_id),
+            "cluster_name": self.__cluster_name,
             "dns_ip": self._cluster_internal_ips.get_ip(5),
-            "master_ip": self._butt_ips.get_ip(self._master_ip_offset),
-            "kube_master": self._butt_ips.get_ip(self._master_ip_offset),  # wtf?
-            "master_port": 443,
-            "cluster_ip": self._cluster_internal_ips.get_ip(1),
+            "master_ip": self._butt_ips.get_ip(self._master_ip_offset),  # set master to first master - used to set a lb master if applicable
+            "kube_master": self._butt_ips.get_ip(self._master_ip_offset),  # wtf? why is this twice
+            "master_port": 443,  # do we ever want anything else?
+            "cluster_ip": self._cluster_internal_ips.get_ip(1),  # used in ssl certs
             "ssh_pub_keys": __ssh_pub_key_helper.get_pub_keys(),
             "optionalHostnameOverride": "",
             "additionalLabels": "",
             "nameserver_config": "",
             "hostsfile": "",
             "resolvconf": "",
-            "dashboardFQDN": "dashboard-{}.weave.local".format(args.cluster_id),
+            "dashboardFQDN": "dashboard-{}.example.com".format(args.cluster_id),
             "base_image": "coreos_image.img",
             "coreos_image": "coreos_production_qemu_image.img.bz2",
-            "ipOffsets": {
-                "masters": 10,
-                "workers": 30
-            },
             "etcdVersion": "3.2.9",
         }
         # these need cluster_name to be set first
-        self._cluster_info["etcd_hosts"] = self.get_etcd_hosts()
-        self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
-        self._cluster_info["kube_masters"] = self.get_kube_masters()
-        self._cluster_info["etcdEndpoints"] = self.get_etcd_endpoints()
+        self._cluster_info["etcd_hosts"] = self._kube_masters.etcd_hosts_string
+        self._cluster_info["etcd_initial_cluster"] = self._kube_masters.etcd_initial_cluster_string
+        self._cluster_info["kube_masters"] = self._kube_masters.k8s_masters_string
+        self._cluster_info["etcdEndpoints"] = self._kube_masters.etcd_endpoints_string
         if args.buttdir is not None:
             self._cluster_info["buttdir"] = "{}/{}".format(args.buttdir, self._cluster_info['cluster_name'])
         else:
@@ -93,55 +93,55 @@ class ButtBuilder(object):
         except IOError as exc:
             print(exc)
 
-    def get_kube_masters(self):
-        """:returns: list - k8s api endpoints"""
-        return ','.join(
-            ["https://%s" % (master) for master in self.get_master_hosts()])
-
-    def get_etcd_endpoints(self):
-        """:returns: list - etcd endpoints without http:// fo ruse by gateway"""
-        return ','.join(
-            ["%s:2379" % (master) for master in self.get_master_hosts()])
-
-    def get_master_hosts(self):
-        """:returns: list - master host names"""
-        return [
-            "kube-master-%s-%02d" % (self._cluster_info['cluster_name'], i + 1)
-            for i in range(self._env_info['masters']['nodes'])
-        ]
-
-    def get_worker_hosts(self):
-        """DEPRICATED - convert to non-deterministic hostnames
-        :returns: list of worker hostsnames"""
-        return [
-            "kube-worker-%s-%02d" % (self._cluster_info['cluster_name'], i + 1)
-            for i in range(self._env_info['workers']['nodes'])
-        ]
-
-    def get_master_ips(self):
-        """:returns: list of master ip addresses"""
-        if "ipOffsets" in self._cluster_info:
-            offset = self._cluster_info['ipOffsets']['masters']
-        else:
-            offset = self._master_ip_offset
-        return [
-            str(
-                ipaddress.IPv4Network(self._env_info['externalNet'])[i + offset])
-            for i in range(self._env_info['masters']['nodes'])
-        ]
-
-    def get_initial_cluster(self):
-        """:returns: - string - etcd initial cluster string"""
-        masters = self.get_master_hosts()
-        return ",".join([
-            "%s=http://%s:2380" % (master, master)
-            for index, master in enumerate(masters)
-        ])
-
-    def get_etcd_hosts(self):
-        """:returns: string - comma delimeted string of proto://host:port"""
-        return ",".join(
-            ["http://%s:2379" % master for master in self.get_master_hosts()])
+    # def get_kube_masters(self):
+    #     """:returns: list - k8s api endpoints"""
+    #     return ','.join(
+    #         ["https://%s" % (master) for master in self.get_master_hosts()])
+    #
+    # def get_etcd_endpoints(self):
+    #     """:returns: list - etcd endpoints without http:// fo ruse by gateway"""
+    #     return ','.join(
+    #         ["%s:2379" % (master) for master in self.get_master_hosts()])
+    #
+    # def get_master_hosts(self):
+    #     """:returns: list - master host names"""
+    #     return [
+    #         "kube-master-%s-%02d" % (self._cluster_info['cluster_name'], i + 1)
+    #         for i in range(self._env_info['masters']['nodes'])
+    #     ]
+    #
+    # def get_worker_hosts(self):
+    #     """DEPRICATED - convert to non-deterministic hostnames
+    #     :returns: list of worker hostsnames"""
+    #     return [
+    #         "kube-worker-%s-%02d" % (self._cluster_info['cluster_name'], i + 1)
+    #         for i in range(self._env_info['workers']['nodes'])
+    #     ]
+    #
+    # def get_master_ips(self):
+    #     """:returns: list of master ip addresses"""
+    #     if "ipOffsets" in self._cluster_info:
+    #         offset = self._cluster_info['ipOffsets']['masters']
+    #     else:
+    #         offset = self._master_ip_offset
+    #     return [
+    #         str(
+    #             ipaddress.IPv4Network(self._env_info['externalNet'])[i + offset])
+    #         for i in range(self._env_info['masters']['nodes'])
+    #     ]
+    #
+    # def get_initial_cluster(self):
+    #     """:returns: - string - etcd initial cluster string"""
+    #     masters = self.get_master_hosts()
+    #     return ",".join([
+    #         "%s=http://%s:2380" % (master, master)
+    #         for index, master in enumerate(masters)
+    #     ])
+    #
+    # def get_etcd_hosts(self):
+    #     """:returns: string - comma delimeted string of proto://host:port"""
+    #     return ",".join(
+    #         ["http://%s:2379" % master for master in self.get_master_hosts()])
 
     def update_kube_config(self):
         """ Add new context into kube config"""
@@ -198,11 +198,11 @@ class ButtBuilder(object):
                 stdout=subprocess.PIPE,
                 universal_newlines=True)
 
-    def get_worker_ip(self, index):
-        """:returns: string - ip in externalNet range"""
-        return str(
-            ipaddress.IPv4Network(self._env_info['externalNet'])[
-                index + self._worker_ip_offset])
+    # def get_worker_ip(self, index):
+    #     """:returns: string - ip in externalNet range"""
+    #     return str(
+    #         ipaddress.IPv4Network(self._env_info['externalNet'])[
+    #             index + self._worker_ip_offset])
 
     def get_kube_addons(self):
         """:returns: string - everything in butt-templates/addons converted to string"""
