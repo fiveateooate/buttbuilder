@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
 
-import sys
-import os
-# goofyness to get import working
-sys.path.append(os.getcwd())
-
-import pprint
-
+import pytest
 import buttlib
+import yaml
+import ipaddress
 
-def main():
-    pp = pprint.PrettyPrinter()
-    butt_ips = buttlib.common.ButtIps(network="10.128.0.0/20", subnet_offset=1)
-    pp.pprint(butt_ips.get_subnets())
-    pp.pprint(butt_ips.get_ip(12))
-    pp.pprint(butt_ips.get_random_ip())
 
-    moar_ips = buttlib.common.ButtIps(network="191.168.0.0/24")
-    pp.pprint(moar_ips.get_subnets())
-    pp.pprint(moar_ips.get_ip(12))
-    pp.pprint(moar_ips.get_random_ip())
+class TestButtIPs():
+    def setup(self):
+        with open("tests/cluster.yaml") as fd:
+            args = yaml.load(fd.read())
+        self.args = args['noenv:buttbuildertest']
+        self.butt_ips = buttlib.common.ButtIps(network=self.args['externalNet'])
 
-if __name__ == "__main__":
-    main()
+    def test_get_network(self):
+        result = self.butt_ips.get_network()
+        print(result)
+        assert isinstance(result, ipaddress.IPv4Network)
+
+    def test_subnet_get(self):
+        result = self.butt_ips.get_subnets()
+        print(result)
+        assert isinstance(result, list) and len(result) == 1 and isinstance(result[0], ipaddress.IPv4Network)
+
+    def test_get_ip(self):
+        ip = self.butt_ips.get_ip(5)
+        print(ip)
+        assert ip == '10.254.0.5'
+
+    def test_get_random_ip(self):
+        ip = ipaddress.ip_address(self.butt_ips.get_random_ip())
+        print(ip)
+        assert isinstance(ip, ipaddress.IPv4Address) and ip in self.butt_ips.get_network()

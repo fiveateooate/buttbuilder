@@ -7,10 +7,10 @@ import json
 
 
 class InstanceBody(object):
-    def __init__(self):
+    def __init__(self, name="", machine_type="", zone="", image="", subnetwork_url="", disk_size=""):
         # both name and machineType should be set
-        self.name = ""
-        self.machineType = ""
+        self.name = name
+        self.machineType = "zones/{zone}/machineTypes/{type}".format(zone=zone, type=machine_type)
         # needs some user-data format - {"key: "user-data", "value": "blah blah" } added to items[]
         self.metadata = {
             "items": []
@@ -29,13 +29,14 @@ class InstanceBody(object):
             "boot": True,
             "autoDelete": True,
             "initializeParams": {
-                "sourceImage": "",
-                "diskType": ""
+                "sourceImage": "/".join(image.split("/")[-3:]),
+                "diskType": "zones/{zone}/diskTypes/pd-ssd".format(zone=zone),
+                "diskSizeGb": disk_size
             }
         }]
         # network and networkIP need to be set
         self.networkInterfaces = [{
-            "subnetwork": "",
+            "subnetwork": subnetwork_url,
             "name": "interface0",
             "accessConfigs": [{
                 "kind": "compute#accessConfig",
@@ -56,6 +57,12 @@ class InstanceBody(object):
         self.__clean_metadata(some_metadata)
         self.metadata["items"].append(some_metadata)
 
+    def set_name(self, name):
+        self.name = name
+
+    def set_machine_type(self, zone, machine_type):
+        self.machineType = "zones/{zone}/machineTypes/{type}".format(zone=zone, type=machine_type)
+
     def set_userdata(self, userdata):
         if not isinstance(userdata, str):
             raise ValueError
@@ -63,11 +70,12 @@ class InstanceBody(object):
         self.__clean_metadata(ud)
         self.metadata["items"].append(ud)
 
-    def set_disk(self, image):
-        self.disks[0]["initializeParams"]["sourceImage"] = "/".join(image.split("/")[-4:])
+    def set_disk(self, zone, image):
+        self.disks[0]["initializeParams"]["sourceImage"] = "/".join(image.split("/")[-5:])
+        self.disks[0]["initializeParams"]["diskType"] = "zones/{zone}/diskTypes/pd-ssd".format(zone=zone)
 
-    def set_interface(self, subnetwork_url, ip_address):
-        self.networkInterfaces[0]["subnetwork"] = "/".join(subnetwork_url.split("/")[-3:])
+    def set_interface(self, subnetwork_url):
+        self.networkInterfaces[0]["subnetwork"] = subnetwork_url
         # self.networkInterfaces[0]["networkIP"] = ip_address
 
     def json(self):

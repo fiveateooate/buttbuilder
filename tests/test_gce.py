@@ -114,6 +114,7 @@ class TestGCE():
         print(result)
         assert isinstance(result, list)
 
+    # tests for instances
     def test_gce_instances_get(self):
         """Test buttlib.gce.instances.get()"""
         self.client.zone = self.args['test_zone']
@@ -121,18 +122,23 @@ class TestGCE():
         print(result)
         assert isinstance(result, dict) and result == {}
 
-    # tests for instances
     def test_gce_create_instance(self):
         image = buttlib.gce.images.getFromFamily(self.client)
         subnetwork = buttlib.gce.subnetworks.get(self.client, self.args['test_subnetwork_name'])
         ib = buttlib.gce.InstanceBody()
-        ib.name = self.args["test_instance_name"]
-        ib.machineType = self.args['masters']['machineType']
-        ib.set_interface(subnetwork['selfLink'], "1.2.3.4")
-        ib.set_disk(image['selfLink'])
-        print(image)
-        print(subnetwork)
-        print(ib.json())
+        self.client.zone = self.args["test_zone"]
+        ib.set_name(self.args["test_instance_name"])
+        ib.set_machine_type(self.client.zone, self.args['masters']['machineType'])
+        ib.set_interface(subnetwork['selfLink'])
+        ib.set_disk(self.client.zone, image['selfLink'])
+        result = buttlib.gce.instances.create(self.client, ib.__dict__)
+        print(result)
+        assert isinstance(result, dict) and result['kind'] == 'compute#instance' and result['name'] == self.args["test_instance_name"]
+
+    def test_instance_delete(self):
+        result = buttlib.gce.instances.delete(self.client, self.args["test_instance_name"])
+        print(result)
+        assert isinstance(result, dict) and result == {}
 
     # clean up
     def test_gce_instance_groups_delete(self):

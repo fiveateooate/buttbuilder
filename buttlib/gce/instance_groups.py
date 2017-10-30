@@ -54,3 +54,16 @@ def delete(client, name):
     except errors.HttpError as exc:
         print(exc)
     return retval
+
+
+def add_instances(client, group, instance):
+    retval = {}
+    try:
+        body = {"instances": [{"instance": instance}]}
+        operation = client.connection.instanceGroups().addInstances(project=project, zone=zone, instanceGroup=group, body=body).execute()
+        result = buttlib.gce.zone_operations.wait(client, operation['name'])
+        return result
+    except errors.HttpError as exc:
+        retval = None
+        print(exc)
+    return retval

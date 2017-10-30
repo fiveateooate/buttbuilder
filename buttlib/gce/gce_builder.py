@@ -99,21 +99,25 @@ class Builder(buttlib.common.ButtBuilder):
             index + self._cluster_info['ipOffsets'][role])
         hostname = self.__get_hostname(role, index)
         vm_tmp = {"hostname": hostname, "ip": ip_address}
-        vm_info = copy.deepcopy(_CONFIG_TMPL)
-        vm_info['name'] = vm_tmp["hostname"]
-        vm_info['machineType'] = "zones/{zone}/machineTypes/{type}".format(zone=zone, type=self._env_info[role]['machineType'])
-        vm_info['disks'][0]['initializeParams']['sourceImage'] = image
-        vm_info['disks'][0]['initializeParams']['diskSizeGb'] = self._env_info[role]['rootDiskSize']
-        vm_info['disks'][0]['initializeParams']['diskType'] = "zones/{}/diskTypes/pd-ssd".format(zone)
-        vm_info['networkInterfaces'][0]['network'] = self.__network_url
-        vm_info['networkInterfaces'][0]['networkIP'] = ip_address
-        vm_info['metadata']['items'][0]['value'] = self.get_user_data(role, vm_tmp)
-        vm_info['additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(self._env_info['region'], zone)
-        return vm_info
+        vm_config = buttlib.gce.InstanceBody(name=hostname,
+                                             machine_type=self._env_info[role]['machineType'],
+                                             zone=zone,
+                                             image=image,
+                                             subnetwork_url=self.__network_url,
+                                             disk_size=self._env_info[role]['rootDiskSize'])
+        vm_config.set_userdata(self.get_user_data(role, vm_tmp))
+        # if butt provider works these probably are not needed
+        vm_config['additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={}".format(self._env_info['region'])
+        vm_config['additionalLabels'] += ",failure-domain.beta.kubernetes.io/zone={}".format(zone)
+        return vm_config
 
     def get_master_info(self):
         return [
-            {"hostname": "kube-master-%s-%02d" % (self._cluster_info['cluster_name'], i + 1), "ip": self._butt_ips.get_ip(self._cluster_info['ipOffsets']['masters'] + i)} for i in range(self._env_info['masters']['nodes'])
+            {
+             "hostname": "kube-master-{}-{02d}".format(self._cluster_info['cluster_name'], i + 1),
+             "ip": self._butt_ips.get_ip(self._cluster_info['ipOffsets']['masters'] + i)
+            }
+            for i in range(self._env_info['masters']['nodes'])
         ]
 
     def get_master_ips(self):
@@ -272,12 +276,27 @@ class Builder(buttlib.common.ButtBuilder):
             for index, master in enumerate(self.get_master_info())
         ])
 
-    def add_node(self, args):
+    def create_master_cluster(self):
+        pass
+        # create master subnet
+        # do something about ips and get etcd inital cluster
+        # create vms
+        # add instance to group
+        # crewate whatever lb and fw configs
+
+    def add_worker_node(self, args):
         pass
         # get an ip
         # create a config?
         # create vm
-        # return operation
+        # add to instance group
+        # fw/lb adjustments
+
+    def delete_worker_node(self, instnace_name):
+        pass
+        # instance = buttlib.instance.get(client, instance_name)
+        # buttlib.gce.instance.delete(client, instance_name)
+        # adjust fw/lb
 
     def build(self):
         """create the butt"""
@@ -350,8 +369,8 @@ class Builder(buttlib.common.ButtBuilder):
             self.__ssl_helper.getInfo()["%s_key" % vm_info['hostname']]
         }
         if "network" in self._env_info:
-            self._cluster_info['resolvconf'] = self._cluster_info['resolvconf']%(self._env_info['network'])
-            self._cluster_info['hostsfile'] = self._cluster_info['hostsfile_tmpl']%(vm_info)
+            self._cluster_info['resolvconf'] = self._cluster_info['resolvconf'] % (self._env_info['network'])
+            self._cluster_info['hostsfile'] = self._cluster_info['hostsfile_tmpl'] % (vm_info)
         if role == 'masters':
             user_data = self._cluster_info['user_data_tmpl']['master'] % (
                 {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})

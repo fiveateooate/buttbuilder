@@ -39,16 +39,23 @@ def create(client, body):
     instance = {}
     try:
         operation = client.connection.instances().insert(project=client.project, zone=client.zone, body=body).execute()
-        buttlib.gce.zone_operations.wait(client, zone, operation['name'])
-        retval = get(client, zone, body['name'])
+        buttlib.gce.zone_operations.wait(client, operation['name'])
+        retval = get(client, body['name'])
     except errors.HttpError as exc:
         retval = None
         print(exc)
     return retval
 
 
-def delete(client, instance):
-    pass
+def delete(client, instance_name):
+    retval = {"name": instance_name}
+    try:
+        operation = client.connection.instances().delete(project=client.project, zone=client.zone, instance=instance_name).execute()
+        buttlib.gce.zone_operations.wait(client, operation['name'])
+        retval = get(client, instance_name)
+    except errors.HttpError as exc:
+        print(exc)
+    return retval
 
 
 def start(client, instance):
