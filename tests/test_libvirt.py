@@ -5,6 +5,7 @@ import random
 import string
 import libvirt
 import os
+import time
 
 
 ##
@@ -42,4 +43,11 @@ class TestLibvirt():
         storage_config = {"name": self.args['pool_name'], "path": self.args['pool_path'], "autostart": True}
         result = buttlib.libvirt.storage.create(self.client, storage_config)
         print(result)
+        time.sleep(20)
         assert isinstance(result, libvirt.virStoragePool)
+
+    def test_storage_delete(self):
+        storage_config = {"name": self.args['pool_name'], "path": self.args['pool_path'], "autostart": True}
+        result = buttlib.libvirt.storage.delete(self.client, storage_config)
+        print(result)
+        assert isinstance(result, list) and result == []

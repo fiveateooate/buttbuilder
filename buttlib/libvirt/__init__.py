@@ -8,3 +8,9 @@ from buttlib.libvirt.storage import (
     create,
     delete
 )
+from buttlib.libvirt.networks import (
+    get,
+    list,
+    create,
+    delete
+)

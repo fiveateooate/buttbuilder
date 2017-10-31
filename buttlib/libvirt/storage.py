@@ -49,7 +49,15 @@ def create(client, storage_config):
     return pool
 
 
-def delete(client, storage_name):
-    pass
-    # pool.destroy()
-    # pool.undefine()
+def delete(client, name):
+    pool = {"name": name}
+    try:
+        pool = get(client, name)
+        if pool:
+            pool.destroy()
+            pool.undefine()
+            pool = get(client, name)
+    except libvirt.libvirtError as exc:
+        print(exc)
+        pool = None
+    return pool
