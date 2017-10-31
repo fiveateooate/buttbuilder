@@ -1,3 +1,4 @@
 from buttlib.exceptions.exceptions import (
-    LibVirtConnectionError
+    LibVirtConnectionError,
+    MissingEnvVarsError
 )

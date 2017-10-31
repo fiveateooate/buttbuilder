@@ -43,21 +43,24 @@ class Builder(buttlib.common.ButtBuilder):
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
         self.__libvirt_uri = env_info['libvirtURI']
         self.__buttpool = "%s-pool" % (self._cluster_info['cluster_name'])
-        self.__buttnet = "%s-net" % (self._cluster_info['cluster_name'])
+        # self._cluster_info['network_name'] = "%s-net" % (self._cluster_info['cluster_name'])
         self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']))
         self.__client = buttlib.libvirt.LibvirtClient(self.__libvirt_uri)
+        self.__coreos_image_name_zipped = "coreos_production_qemu_image.img.bz2"
+        self.__coreos_image_name = "coreos_production_qemu_image.img"
 
     def build(self):
         """Gathers up config and calls various functions to create a kubernetes cluster"""
-        self.__ssl_helper.createCerts(self.get_master_ips(), self._cluster_info["cluster_ip"], self.get_master_hosts())
-        __vm_initial_configs = self.generate_vm_configs()
-        self.fetch_image()
-        #        self.set_cluster_info(__vm_initial_configs)
-        self.create_butt_pool()
+        self.__ssl_helper.createCerts(self._kube_masters.ips, self._cluster_info["cluster_ip"], self._kube_masters.hostnames)
+        # __vm_initial_configs = self.generate_vm_configs()
+        buttlib.common.fetch_coreos_image(self._cluster_info['buttdir'], self._env_info['coreosChannel'], self.__coreos_image_name_zipped)
+        return
+        self.create_storage_pool()
         self.create_butt_network(__vm_initial_configs)
-        for vm_config in __vm_initial_configs['masters']:
+        for hostname, ip in self._kube_masters.masters:
+            vm_config = self.generate_master_config(hostname, ip)
             self.create_vm(vm_config, 'master')
-        for vm_config in __vm_initial_configs['workers']:
+        for hostname, ip in self._kube_workers.workers:
             self.create_vm(vm_config, 'worker')
 
     def create_vm(self, vm_config, vm_role):
@@ -76,16 +79,14 @@ class Builder(buttlib.common.ButtBuilder):
             result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
             print(result.stdout)
 
-    def generate_master_config(self, index):
-        hostname = "kube-master-{}-{:02d}".format(self._cluster_info['cluster_name'], index + 1)
-        host_ip = str(ipaddress.IPv4Network(self._env_info['externalNet'])[index + self._master_ip_offset])
-        self.__ssl_helper.generateHost(hostname, host_ip)
+    def generate_master_config(self, hostname, ip):
+        self.__ssl_helper.generateHost(hostname, ip)
         vm_config = {
             "hostname": hostname,
-            "mac": self.random_mac(),
-            "ip": host_ip,
+            "mac": buttlib.common.random_mac(),
+            "ip": ip,
             "disk": self._env_info['masters']['disk'],
-            "butt_net": self.__buttnet,
+            "butt_net": self._cluster_info['network_name'],
             "butt_dir": self._cluster_info['buttdir'],
             "ram": self._env_info['masters']['ram'],
             "libvirt_uri": self.__libvirt_uri,
@@ -110,7 +111,7 @@ class Builder(buttlib.common.ButtBuilder):
     def generate_worker_config(self):
         """ return a dict with config for a worker vm"""
         hostname = "kube-worker-{}-{}".format(
-            self._cluster_info['cluster_name'], self.get_hostname_suffix())
+            self._cluster_info['cluster_name'], buttlib.common.random_hostname_suffix())
         host_ip = self.get_random_worker_ip()
         self.__ssl_helper.generateHost(hostname, host_ip)
         vm_config = {
@@ -118,7 +119,7 @@ class Builder(buttlib.common.ButtBuilder):
             "mac": self.random_mac(),
             "ip": host_ip,
             "disk": self._env_info['workers']['disk'],
-            "butt_net": self.__buttnet,
+            "butt_net": self._cluster_info['network_name'],
             "butt_dir": self._cluster_info['buttdir'],
             "ram": self._env_info['workers']['ram'],
             "libvirt_uri": self.__libvirt_uri,
@@ -144,37 +145,37 @@ class Builder(buttlib.common.ButtBuilder):
         }
         return vm_config
 
-    def generate_vm_configs(self):
-        """ returns list of dicts used to configure indvidual virtual machines
-            uses parameters read from a yaml file
-        """
-        vms = {"masters": [], "workers": []}
-        for i in range(self._env_info['masters']['nodes']):
-            vms['masters'].append(self.generate_master_config(i))
-        for i in range(self._env_info['workers']['nodes']):
-            vms['workers'].append(self.generate_worker_config())
-        return vms
+    # def generate_vm_configs(self):
+    #     """ returns list of dicts used to configure indvidual virtual machines
+    #         uses parameters read from a yaml file
+    #     """
+    #     vms = {"masters": [], "workers": []}
+    #     # for i in range(self._env_info['masters']['nodes']):
+    #     #    vms['masters'].append(self.generate_master_config(i))
+    #     for i in range(self._env_info['workers']['nodes']):
+    #         vms['workers'].append(self.generate_worker_config())
+    #     return vms
 
-    def get_random_worker_ip(self):
-        """:reutrns: string random ip within range"""
-        done = False
-        random_ip = ""
-        while not done:
-            random_ip = ipaddress.IPv4Network(self._env_info['externalNet'])[
-                random.randrange(self._worker_ip_offset, 250)]
-            if random_ip not in self.get_used_ips():
-                done = True
-        return random_ip
-
-    def get_used_ips(self):
-        """:returns: list - ips found in libvirt network config"""
-        result = subprocess.run(
-            ["sudo", "virsh", "net-dhcp-leases", self.__buttnet],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-        # yeah this is fecked but yeah i don't know ...
-        return [(line.split()[4]).split("/")[0]
-                for line in result.stdout.split("\n")[2:-2]]
+    # def get_random_worker_ip(self):
+    #     """:reutrns: string random ip within range"""
+    #     done = False
+    #     random_ip = ""
+    #     while not done:
+    #         random_ip = ipaddress.IPv4Network(self._env_info['externalNet'])[
+    #             random.randrange(self._worker_ip_offset, 250)]
+    #         if random_ip not in self.get_used_ips():
+    #             done = True
+    #     return random_ip
+    #
+    # def get_used_ips(self):
+    #     """:returns: list - ips found in libvirt network config"""
+    #     result = subprocess.run(
+    #         ["sudo", "virsh", "net-dhcp-leases", self._cluster_info['network_name']],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #     # yeah this is fecked but yeah i don't know ...
+    #     return [(line.split()[4]).split("/")[0]
+    #             for line in result.stdout.split("\n")[2:-2]]
 
     def add_dhcp_entry(self, vm_config):
         """adds a dhcp assignement to libvirt network"""
@@ -182,7 +183,7 @@ class Builder(buttlib.common.ButtBuilder):
             vm_config['mac'], vm_config['hostname'], vm_config['ip'])
         subprocess.run(
             [
-                "sudo", "virsh", "net-update", self.__buttnet, "add",
+                "sudo", "virsh", "net-update", self._cluster_info['network_name'], "add",
                 "ip-dhcp-host", dhcp_xml, "--live"
             ],
             stdout=subprocess.PIPE,
@@ -193,7 +194,7 @@ class Builder(buttlib.common.ButtBuilder):
         dhcp_xml = "<host name='{}' />".format(vm_name)
         subprocess.run(
             [
-                "sudo", "virsh", "net-update", self.__buttnet, "delete",
+                "sudo", "virsh", "net-update", self._cluster_info['network_name'], "delete",
                 "ip-dhcp-host", dhcp_xml, "--live"
             ],
             stdout=subprocess.PIPE,
@@ -206,7 +207,7 @@ class Builder(buttlib.common.ButtBuilder):
             [
                 "qemu-img", "create", "-f", "qcow2", "-b",
                 "%s/%s" % (self._cluster_info['buttdir'],
-                           self._cluster_info['base_image']),
+                           self.__coreos_image_name),
                 "%s/%s.qcow2" % (self._cluster_info['buttdir'],
                                  vm_config['hostname'])
             ],
@@ -258,7 +259,7 @@ class Builder(buttlib.common.ButtBuilder):
                         **(self.__ssl_helper.getInfo()),
                         **ud_dict})
 
-    def create_butt_pool(self):
+    def create_storage_pool(self):
         """ create a libvirt storage pool"""
         try:
             self.__client.connection.storagePoolLookupByName(self.__buttpool)
@@ -281,8 +282,7 @@ class Builder(buttlib.common.ButtBuilder):
                     ],
                     stdout=subprocess.PIPE,
                     universal_newlines=True)
-                storage_pool = self.__client.connection.storagePoolLookupByName(
-                    self.__buttpool)
+                storage_pool = self.__client.connection.storagePoolLookupByName(self.__buttpool)
                 storage_pool.setAutostart(1)
                 print("Storage pool created")
 
@@ -290,21 +290,21 @@ class Builder(buttlib.common.ButtBuilder):
         """ create libvirt network including dhcp setup"""
         if [
                 net for net in self.__client.connection.listNetworks()
-                if net == self.__buttnet
+                if net == self._cluster_info['network_name']
         ] != []:
-            # network = self.__client.connection.networkLookupByName(self.__buttnet)
+            # network = self.__client.connection.networkLookupByName(self._cluster_info['network_name'])
             print("Destroying Network")
             subprocess.run(
                 ["sudo", "virsh", "net-destroy",
-                 "%s" % self.__buttnet],
+                 "%s" % self._cluster_info['network_name']],
                 stdout=subprocess.PIPE,
                 universal_newlines=True)
             subprocess.run(
                 ["sudo", "virsh", "net-undefine",
-                 "%s" % self.__buttnet],
+                 "%s" % self._cluster_info['network_name']],
                 stdout=subprocess.PIPE,
                 universal_newlines=True)
-        print("Creating network %s" % (self.__buttnet))
+        print("Creating network %s" % (self._cluster_info['network_name']))
         dhcp_setup = ""
         for master in __vm_initial_configs['masters']:
             dhcp_setup += "<host mac='%s' name='%s' ip='%s'/>\n" % (
@@ -315,7 +315,7 @@ class Builder(buttlib.common.ButtBuilder):
         iprange = list(
             ipaddress.IPv4Network(self._env_info['externalNet']).hosts())
         xml = Builder.__LIBVIRT_NETWORK_TMPLT__ % (
-            self.__buttnet, self.__buttnet[:5], self.random_mac(), iprange[-1],
+            self._cluster_info['network_name'], self._cluster_info['network_name'][:5], self.random_mac(), iprange[-1],
             (ipaddress.IPv4Network(self._env_info['externalNet'])).netmask,
             iprange[0], iprange[-2], dhcp_setup)
         temp_file = tempfile.NamedTemporaryFile()
@@ -329,12 +329,12 @@ class Builder(buttlib.common.ButtBuilder):
         temp_file.close()
         subprocess.run(
             ["sudo", "virsh", "net-start",
-             "%s" % self.__buttnet],
+             "%s" % self._cluster_info['network_name']],
             stdout=subprocess.PIPE,
             universal_newlines=True)
         subprocess.run(
             ["sudo", "virsh", "net-autostart",
-             "%s" % self.__buttnet],
+             "%s" % self._cluster_info['network_name']],
             stdout=subprocess.PIPE,
             universal_newlines=True)
 

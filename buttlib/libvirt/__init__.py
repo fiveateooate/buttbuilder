@@ -2,3 +2,9 @@
 
 from buttlib.libvirt.libvirt_builder import Builder
 from buttlib.libvirt.client import LibvirtClient
+from buttlib.libvirt.storage import (
+    get,
+    list,
+    create,
+    delete
+)

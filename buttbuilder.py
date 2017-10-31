@@ -8,12 +8,12 @@ import os
 def build(args, cluster_config_info, builder):
     try:
         builder.build()
-        builder.update_kube_config()
+        # builder.update_kube_config()
     except buttlib.common.MissingEnvVarsError as exception:
         print(exception)
     except buttlib.common.IncompleteEnvironmentSetup as exception:
         print(exception)
-    except buttlib.common.LibVirtConnectionError as exception:
+    except buttlib.exceptions.LibVirtConnectionError as exception:
         print(exception)
     except buttlib.common.DoNotDestroyCluster as exception:
         print(exception)

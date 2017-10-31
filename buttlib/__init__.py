@@ -5,6 +5,7 @@
 import sys
 import buttlib.common
 import buttlib.helpers
+import buttlib.exceptions
 
 # if 'provider' in os.environ:
 #     if os.environ['provider'] == 'aws':

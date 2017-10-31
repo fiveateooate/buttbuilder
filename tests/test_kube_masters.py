@@ -22,9 +22,13 @@ class TestKubeMasters():
         print(str(self.kube_masters.k8s_masters_string))
         assert self.kube_masters.k8s_masters_string == "https://kube-master-bbtest-noenv-01,https://kube-master-bbtest-noenv-02"
 
+    def test_etcd_hosts_string(self):
+        print(str(self.kube_masters.etcd_hosts_string))
+        assert self.kube_masters.etcd_hosts_string == "http://kube-master-bbtest-noenv-01:2379,http://kube-master-bbtest-noenv-02:2379"
+
     def test_etcd_endpoints_string(self):
         print(str(self.kube_masters.etcd_endpoints_string))
-        assert self.kube_masters.etcd_endpoints_string == "http://kube-master-bbtest-noenv-01:2379,http://kube-master-bbtest-noenv-02:2379"
+        assert self.kube_masters.etcd_endpoints_string == "kube-master-bbtest-noenv-01:2379,kube-master-bbtest-noenv-02:2379"
 
     def test_initial_cluster_ips(self):
         self.kube_masters.use_ips = True
@@ -39,4 +43,21 @@ class TestKubeMasters():
     def test_etcd_endpoints_string_ips(self):
         self.kube_masters.use_ips = True
         print(str(self.kube_masters.etcd_endpoints_string))
-        assert self.kube_masters.etcd_endpoints_string == "http://192.168.69.10:2379,http://192.168.69.11:2379"
+        assert self.kube_masters.etcd_endpoints_string == "192.168.69.10:2379,192.168.69.11:2379"
+
+    def test_etcd_hosts_string_ips(self):
+        self.kube_masters.use_ips = True
+        print(str(self.kube_masters.etcd_hosts_string))
+        assert self.kube_masters.etcd_hosts_string == "http://192.168.69.10:2379,http://192.168.69.11:2379"
+
+    def test_ips(self):
+        print(self.kube_masters.ips)
+        assert isinstance(self.kube_masters.ips, list) and self.kube_masters.ips[0] == '192.168.69.10'
+
+    def test_hostnames(self):
+        print(self.kube_masters.hostnames)
+        assert isinstance(self.kube_masters.hostnames, list) and self.kube_masters.hostnames[0] == 'kube-master-bbtest-noenv-01'
+
+    def test_masters(self):
+        print(self.kube_masters.masters)
+        assert isinstance(self.kube_masters.hostnames, list) and len(self.kube_masters.masters) == self.args['masters']['nodes']

@@ -10,3 +10,14 @@ class LibVirtConnectionError(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+
+class MissingEnvVarsError(KeyError):
+    """ Raise if required env vars are not set """
+
+    def __init__(self, value):
+        KeyError.__init__(self)
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
