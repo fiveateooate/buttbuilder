@@ -8,9 +8,17 @@ from buttlib.libvirt.storage import (
     create,
     delete
 )
-from buttlib.libvirt.networks import (
+from buttlib.libvirt.volumes import (
     get,
     list,
     create,
     delete
+)
+from buttlib.libvirt.networks import (
+    get,
+    list,
+    create,
+    delete,
+    dhcp_add,
+    dhcp_delete
 )

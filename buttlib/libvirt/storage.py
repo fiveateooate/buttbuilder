@@ -3,7 +3,7 @@
 import libvirt
 
 
-xmlDesc_tmptl = """
+xmldesc_tmplt = """
 <pool type='dir'>
   <name>{name}</name>
   <source>
@@ -22,42 +22,42 @@ def get(client, name):
     try:
         pool = client.connection.storagePoolLookupByName(name)
     except libvirt.libvirtError as exc:
-        pool = []
+        print(exc)
     return pool
 
 
 def list(client):
-    pools = []
     try:
         pools = client.connection.listAllStoragePools()
     except libvirt.libvirtError as exc:
-        pools = None
+        print(exc)
+        pools = []
     return pools
 
 
 def create(client, storage_config):
-    pool = get(client, storage_config['name'])
-    if not pool:
+    pool = []
+    if not get(client, storage_config['name']):
         try:
-            poolXML = xmlDesc_tmptl.format(**storage_config)
+            poolXML = xmldesc_tmplt.format(**storage_config)
             pool = client.connection.storagePoolDefineXML(poolXML, 0)
             pool.create()
             if 'autostart' in storage_config and storage_config['autostart']:
                 pool.setAutostart(1)
         except libvirt.libvirtError as exc:
-            pool = None
+            print(exc)
     return pool
 
 
 def delete(client, name):
-    pool = {"name": name}
+    retval = False
     try:
         pool = get(client, name)
         if pool:
             pool.destroy()
             pool.undefine()
-            pool = get(client, name)
+            retval = True
     except libvirt.libvirtError as exc:
         print(exc)
-        pool = None
-    return pool
+        retval = False
+    return retval

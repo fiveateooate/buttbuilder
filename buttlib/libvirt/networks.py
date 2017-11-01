@@ -3,17 +3,19 @@
 import libvirt
 
 
-xmlDesc_tmplt = """<network>
+xmldesc_tmplt = """<network>
   <name>{name}</name>
   <forward mode='nat'/>
-  <bridge name='%sbr0' stp='on' delay='0'/>
+  <bridge name='{bridgename}' stp='on' delay='0'/>
   <mac address='{mac}'/>
-  <ip address='{gateway_ip}' netmask='{netmask}'>
+  <ip address='{ip}' netmask='{netmask}'>
     <dhcp>
-      <range start='{ip_range_start}' end='{ip_range_end}/>
-      %s</dhcp>
+      <range start='{ip_range_start}' end='{ip_range_end}'/>
+    </dhcp>
   </ip>
 </network>"""
+
+dhcp_entry_tmplt = "<host mac='{mac}' name='{hostname}' ip='{ip}'/>"
 
 
 def get(client, name):
@@ -21,22 +23,76 @@ def get(client, name):
     try:
         network = client.connection.networkLookupByName(name)
     except libvirt.libvirtError as exc:
-        network = []
+        print(exc)
     return network
 
 
 def list(client):
-    networks = []
     try:
-        networks = client.connection.listNetworks()
+        networks = client.connection.listAllNetworks()
     except libvirt.libvirtError as exc:
-        pools = None
+        print(exc)
+        networks = []
     return networks
 
 
 def create(client, network_config):
-    pass
+    network = []
+    if not get(client, network_config['name']):
+        try:
+            if 'bridgename' not in network_config:
+                # max length of bridge name is 15 characters
+                network_config['bridgename'] = network_config['name'].replace("-", "")[:12] + "br0"
+            networkXML = xmldesc_tmplt.format(**network_config)
+            network = client.connection.networkDefineXML(networkXML)
+            network.create()
+            if 'autostart' in network_config and network_config['autostart']:
+                network.setAutostart(1)
+        except libvirt.libvirtError as exc:
+            print(exc)
+    return network
 
 
-def delete(client, network_name):
-    pass
+def delete(client, name):
+    retval = False
+    try:
+        network = get(client, name)
+        if network:
+            network.destroy()
+            network.undefine()
+            retval = True
+    except libvirt.libvirtError as exc:
+        print(exc)
+        retval = False
+    return retval
+
+
+# info network.update call args
+# 1. command - https://libvirt.org/html/libvirt-libvirt-network.html#virNetworkUpdateCommand
+# 2. section - https://libvirt.org/html/libvirt-libvirt-network.html#virNetworkUpdateSection
+# 3. parentIndex - -1 for don't care
+# 4. xml
+def dhcp_add(client, dhcp_config):
+    retval = False
+    try:
+        network = get(client, dhcp_config['network_name'])
+        if network:
+            dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
+            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_ADD_LAST, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml)
+            retval = True
+    except libvirt.libvirtError as exc:
+        print(exc)
+    return retval
+
+
+def dhcp_delete(client, dhcp_config):
+    retval = False
+    try:
+        network = get(client, dhcp_config['network_name'])
+        if network:
+            dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
+            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_DELETE, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml)
+            retval = True
+    except libvirt.libvirtError as exc:
+        print(exc)
+    return retval

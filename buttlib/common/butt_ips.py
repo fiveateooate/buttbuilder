@@ -14,6 +14,9 @@ class ButtIps():
     def get_network(self):
         return ipaddress.IPv4Network(self.__network)
 
+    def get_netmask(self):
+        return ipaddress.IPv4Network(self.__network).netmask
+
     def get_subnets(self):
         """:returns: list of subnets broken on subnet_mask"""
         return list(ipaddress.IPv4Network(self.__network).subnets(new_prefix=self.__subnet_mask))

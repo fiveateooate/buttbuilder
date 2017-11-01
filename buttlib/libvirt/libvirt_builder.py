@@ -26,18 +26,6 @@ class Builder(buttlib.common.ButtBuilder):
 --noautoconsole \
 --network network={butt_net},model=virtio,mac={mac}"""
 
-    __LIBVIRT_NETWORK_TMPLT__ = """<network>
-  <name>%s</name>
-  <forward mode='nat'/>
-  <bridge name='%sbr0' stp='on' delay='0'/>
-  <mac address='%s'/>
-  <ip address='%s' netmask='%s'>
-    <dhcp>
-      <range start='%s' end='%s'/>
-      %s</dhcp>
-  </ip>
-</network>"""
-
     def __init__(self, env_info, args):
         print("NOTE: sudo will be used to interact with libvirt")
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
@@ -177,28 +165,28 @@ class Builder(buttlib.common.ButtBuilder):
     #     return [(line.split()[4]).split("/")[0]
     #             for line in result.stdout.split("\n")[2:-2]]
 
-    def add_dhcp_entry(self, vm_config):
-        """adds a dhcp assignement to libvirt network"""
-        dhcp_xml = "<host mac='%s' name='%s' ip='%s' />" % (
-            vm_config['mac'], vm_config['hostname'], vm_config['ip'])
-        subprocess.run(
-            [
-                "sudo", "virsh", "net-update", self._cluster_info['network_name'], "add",
-                "ip-dhcp-host", dhcp_xml, "--live"
-            ],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-
-    def delete_dhcp_entry(self, vm_name):
-        """delete dhcp assignement from libvirt network"""
-        dhcp_xml = "<host name='{}' />".format(vm_name)
-        subprocess.run(
-            [
-                "sudo", "virsh", "net-update", self._cluster_info['network_name'], "delete",
-                "ip-dhcp-host", dhcp_xml, "--live"
-            ],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
+    # def add_dhcp_entry(self, vm_config):
+    #     """adds a dhcp assignement to libvirt network"""
+    #     dhcp_xml = "<host mac='%s' name='%s' ip='%s' />" % (
+    #         vm_config['mac'], vm_config['hostname'], vm_config['ip'])
+    #     subprocess.run(
+    #         [
+    #             "sudo", "virsh", "net-update", self._cluster_info['network_name'], "add",
+    #             "ip-dhcp-host", dhcp_xml, "--live"
+    #         ],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #
+    # def delete_dhcp_entry(self, vm_name):
+    #     """delete dhcp assignement from libvirt network"""
+    #     dhcp_xml = "<host name='{}' />".format(vm_name)
+    #     subprocess.run(
+    #         [
+    #             "sudo", "virsh", "net-update", self._cluster_info['network_name'], "delete",
+    #             "ip-dhcp-host", dhcp_xml, "--live"
+    #         ],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
 
     def create_volume(self, vm_config):
         """ Expects configuration dict for a virtual machines
@@ -259,89 +247,89 @@ class Builder(buttlib.common.ButtBuilder):
                         **(self.__ssl_helper.getInfo()),
                         **ud_dict})
 
-    def create_storage_pool(self):
-        """ create a libvirt storage pool"""
-        try:
-            self.__client.connection.storagePoolLookupByName(self.__buttpool)
-            print("Storage pool exists")
-        except libvirt.libvirtError:
-            print("Creating storage pool %s" % self.__buttpool)
-            result = subprocess.run(
-                [
-                    "sudo", "virsh", "pool-define-as", "--type=dir",
-                    "--name=%s" % (self.__buttpool),
-                    "--target=%s" % (self._cluster_info['buttdir'])
-                ],
-                stdout=subprocess.PIPE,
-                universal_newlines=True)
-            if result.returncode == 0:
-                subprocess.run(
-                    [
-                        "sudo", "virsh", "pool-start", "--pool",
-                        "%s" % (self.__buttpool)
-                    ],
-                    stdout=subprocess.PIPE,
-                    universal_newlines=True)
-                storage_pool = self.__client.connection.storagePoolLookupByName(self.__buttpool)
-                storage_pool.setAutostart(1)
-                print("Storage pool created")
+    # def create_storage_pool(self):
+    #     """ create a libvirt storage pool"""
+    #     try:
+    #         self.__client.connection.storagePoolLookupByName(self.__buttpool)
+    #         print("Storage pool exists")
+    #     except libvirt.libvirtError:
+    #         print("Creating storage pool %s" % self.__buttpool)
+    #         result = subprocess.run(
+    #             [
+    #                 "sudo", "virsh", "pool-define-as", "--type=dir",
+    #                 "--name=%s" % (self.__buttpool),
+    #                 "--target=%s" % (self._cluster_info['buttdir'])
+    #             ],
+    #             stdout=subprocess.PIPE,
+    #             universal_newlines=True)
+    #         if result.returncode == 0:
+    #             subprocess.run(
+    #                 [
+    #                     "sudo", "virsh", "pool-start", "--pool",
+    #                     "%s" % (self.__buttpool)
+    #                 ],
+    #                 stdout=subprocess.PIPE,
+    #                 universal_newlines=True)
+    #             storage_pool = self.__client.connection.storagePoolLookupByName(self.__buttpool)
+    #             storage_pool.setAutostart(1)
+    #             print("Storage pool created")
 
-    def create_butt_network(self, __vm_initial_configs):
-        """ create libvirt network including dhcp setup"""
-        if [
-                net for net in self.__client.connection.listNetworks()
-                if net == self._cluster_info['network_name']
-        ] != []:
-            # network = self.__client.connection.networkLookupByName(self._cluster_info['network_name'])
-            print("Destroying Network")
-            subprocess.run(
-                ["sudo", "virsh", "net-destroy",
-                 "%s" % self._cluster_info['network_name']],
-                stdout=subprocess.PIPE,
-                universal_newlines=True)
-            subprocess.run(
-                ["sudo", "virsh", "net-undefine",
-                 "%s" % self._cluster_info['network_name']],
-                stdout=subprocess.PIPE,
-                universal_newlines=True)
-        print("Creating network %s" % (self._cluster_info['network_name']))
-        dhcp_setup = ""
-        for master in __vm_initial_configs['masters']:
-            dhcp_setup += "<host mac='%s' name='%s' ip='%s'/>\n" % (
-                master['mac'], master['hostname'], master['ip'])
-        for worker in __vm_initial_configs['workers']:
-            dhcp_setup += "<host mac='%s' name='%s' ip='%s'/>\n" % (
-                worker['mac'], worker['hostname'], worker['ip'])
-        iprange = list(
-            ipaddress.IPv4Network(self._env_info['externalNet']).hosts())
-        xml = Builder.__LIBVIRT_NETWORK_TMPLT__ % (
-            self._cluster_info['network_name'], self._cluster_info['network_name'][:5], self.random_mac(), iprange[-1],
-            (ipaddress.IPv4Network(self._env_info['externalNet'])).netmask,
-            iprange[0], iprange[-2], dhcp_setup)
-        temp_file = tempfile.NamedTemporaryFile()
-        temp_file.write(xml.encode('utf-8'))
-        temp_file.seek(0)
-        subprocess.run(
-            ["sudo", "virsh", "net-define",
-             "%s" % temp_file.name],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-        temp_file.close()
-        subprocess.run(
-            ["sudo", "virsh", "net-start",
-             "%s" % self._cluster_info['network_name']],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-        subprocess.run(
-            ["sudo", "virsh", "net-autostart",
-             "%s" % self._cluster_info['network_name']],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
+    # def create_butt_network(self, __vm_initial_configs):
+    #     """ create libvirt network including dhcp setup"""
+    #     if [
+    #             net for net in self.__client.connection.listNetworks()
+    #             if net == self._cluster_info['network_name']
+    #     ] != []:
+    #         # network = self.__client.connection.networkLookupByName(self._cluster_info['network_name'])
+    #         print("Destroying Network")
+    #         subprocess.run(
+    #             ["sudo", "virsh", "net-destroy",
+    #              "%s" % self._cluster_info['network_name']],
+    #             stdout=subprocess.PIPE,
+    #             universal_newlines=True)
+    #         subprocess.run(
+    #             ["sudo", "virsh", "net-undefine",
+    #              "%s" % self._cluster_info['network_name']],
+    #             stdout=subprocess.PIPE,
+    #             universal_newlines=True)
+    #     print("Creating network %s" % (self._cluster_info['network_name']))
+    #     dhcp_setup = ""
+    #     for master in __vm_initial_configs['masters']:
+    #         dhcp_setup += "<host mac='%s' name='%s' ip='%s'/>\n" % (
+    #             master['mac'], master['hostname'], master['ip'])
+    #     for worker in __vm_initial_configs['workers']:
+    #         dhcp_setup += "<host mac='%s' name='%s' ip='%s'/>\n" % (
+    #             worker['mac'], worker['hostname'], worker['ip'])
+    #     iprange = list(
+    #         ipaddress.IPv4Network(self._env_info['externalNet']).hosts())
+    #     xml = Builder.__LIBVIRT_NETWORK_TMPLT__ % (
+    #         self._cluster_info['network_name'], self._cluster_info['network_name'][:5], self.random_mac(), iprange[-1],
+    #         (ipaddress.IPv4Network(self._env_info['externalNet'])).netmask,
+    #         iprange[0], iprange[-2], dhcp_setup)
+    #     temp_file = tempfile.NamedTemporaryFile()
+    #     temp_file.write(xml.encode('utf-8'))
+    #     temp_file.seek(0)
+    #     subprocess.run(
+    #         ["sudo", "virsh", "net-define",
+    #          "%s" % temp_file.name],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #     temp_file.close()
+    #     subprocess.run(
+    #         ["sudo", "virsh", "net-start",
+    #          "%s" % self._cluster_info['network_name']],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #     subprocess.run(
+    #         ["sudo", "virsh", "net-autostart",
+    #          "%s" % self._cluster_info['network_name']],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
 
-    def get_next_hostname(self):
-        """ figure out the next hostname from what is running"""
-        for domain in self.__client.connection.listAllDomains():
-            print(domain.name())
+    # def get_next_hostname(self):
+    #     """ figure out the next hostname from what is running"""
+    #     for domain in self.__client.connection.listAllDomains():
+    #         print(domain.name())
 
     def add_node(self):
         """add a node to existing kubernetes cluster"""

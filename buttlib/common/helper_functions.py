@@ -14,7 +14,7 @@ def random_mac():
         0x52, 0x54, 0x00, random.randint(0x00, 0x7f), random.randint(
             0x00, 0xff), random.randint(0x00, 0xff)
     ]
-    return ':'.join(map(lambda x: ":02x".format(x), mac))
+    return ':'.join(["{:02x}".format(x) for x in mac])
 
 
 def random_hostname_suffix(suffix_length=5):

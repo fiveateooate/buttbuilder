@@ -36,3 +36,9 @@ client.getFreeMemory()                  client.listDomainsID()                  
 client.getFreePages()                   client.listInterfaces()                 client.numOfSecrets()                   client.virConnResetLastError()
 client.getHostname()                    client.listNWFilters()                  client.numOfStoragePools()   
 ~~~
+
+## libvirt network functions
+~~~
+network.DHCPLeases(    network.UUIDString(    network.autostart(     network.c_pointer(     network.create(        network.isActive(      network.name(          network.undefine(
+network.UUID(          network.XMLDesc(       network.bridgeName(    network.connect(       network.destroy(       network.isPersistent(  network.setAutostart(  network.update(
+~~~
