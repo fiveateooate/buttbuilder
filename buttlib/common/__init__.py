@@ -17,3 +17,4 @@ from buttlib.common.helper_functions import (
     update_kube_config
 )
 from buttlib.common.kube_workers import KubeWorkers
+from buttlib.common.butt_instance_config import ButtInstanceConfig

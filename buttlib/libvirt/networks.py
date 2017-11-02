@@ -37,19 +37,17 @@ def list(client):
 
 
 def create(client, network_config):
-    network = []
-    if not get(client, network_config['name']):
-        try:
-            if 'bridgename' not in network_config:
-                # max length of bridge name is 15 characters
-                network_config['bridgename'] = network_config['name'].replace("-", "")[:12] + "br0"
-            networkXML = xmldesc_tmplt.format(**network_config)
-            network = client.connection.networkDefineXML(networkXML)
-            network.create()
-            if 'autostart' in network_config and network_config['autostart']:
-                network.setAutostart(1)
-        except libvirt.libvirtError as exc:
-            print(exc)
+    try:
+        if 'bridgename' not in network_config:
+            # max length of bridge name is 15 characters
+            network_config['bridgename'] = network_config['name'].replace("-", "")[:12] + "br0"
+        networkXML = xmldesc_tmplt.format(**network_config)
+        network = client.connection.networkDefineXML(networkXML)
+        network.create()
+        if 'autostart' in network_config and network_config['autostart']:
+            network.setAutostart(1)
+    except libvirt.libvirtError as exc:
+        network = None
     return network
 
 
@@ -65,6 +63,16 @@ def delete(client, name):
         print(exc)
         retval = False
     return retval
+
+
+def exists(client, name):
+    exists = False
+    networks = list(client)
+    for network in networks:
+        if network.name() == name:
+            exists = True
+            break
+    return exists
 
 
 # info network.update call args

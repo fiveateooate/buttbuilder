@@ -1,11 +1,11 @@
 """ builder class for libvirt
 """
-import ipaddress
+# import ipaddress
 import os
-import stat
-import random
-import subprocess
-import tempfile
+# import stat
+# import random
+# import subprocess
+# import tempfile
 import libvirt
 import yaml
 import buttlib
@@ -29,109 +29,151 @@ class Builder(buttlib.common.ButtBuilder):
     def __init__(self, env_info, args):
         print("NOTE: sudo will be used to interact with libvirt")
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
-        self.__libvirt_uri = env_info['libvirtURI']
-        self.__buttpool = "%s-pool" % (self._cluster_info['cluster_name'])
+        # self.__libvirt_uri = env_info['libvirtURI']
         # self._cluster_info['network_name'] = "%s-net" % (self._cluster_info['cluster_name'])
-        self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']))
-        self.__client = buttlib.libvirt.LibvirtClient(self.__libvirt_uri)
-        self.__coreos_image_name_zipped = "coreos_production_qemu_image.img.bz2"
-        self.__coreos_image_name = "coreos_production_qemu_image.img"
+        self.__client = buttlib.libvirt.LibvirtClient(env_info['libvirtURI'])
+        # self.__coreos_image_name_zipped = "coreos_production_qemu_image.img.bz2"
+        # self.__coreos_image_name = "coreos_production_qemu_image.img"
+        # add some libvirt specific crap
+        self._cluster_info.update({
+            'network_config': {
+                "name": self._cluster_info['cluster_name'] + "-net",
+                "ip": self._butt_ips.get_ip(1),
+                "netmask": self._butt_ips.get_netmask(),
+                "ip_range_start": self._butt_ips.get_ip(2),
+                "ip_range_end": self._butt_ips.get_ip(254),
+                "mac": buttlib.common.random_mac(),
+                "autostart": True
+            },
+            'storage_pool_config': {
+                "name": self._cluster_info['cluster_name'] + "-pool",
+                "path": self._cluster_info['buttdir'],
+                "autostart": True
+            },
+            'kube_master_lb_ip': self._butt_ips.get_ip(self._cluster_info['ip_offset']['masters']),
+            'base_image': self._cluster_info['buttdir'] + "/" + "coreos_production_qemu_image.img"
+        })
+        self.__storage_pool = None
+        self.__network = None
+
+    def __pre_build(self):
+        # probably do some checking exists stuff
+        # gen admin and api certs
+        self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], self._kube_masters.hostnames)
+        # fetch the base image
+        buttlib.common.fetch_coreos_image(self._cluster_info['buttdir'], self._env_info['coreosChannel'])
+        # create the storage pool
+        if not buttlib.libvirt.storage.exists(self.__client, self._cluster_info['storage_pool_config']['name']):
+            self.__storage_pool = buttlib.libvirt.storage.create(self.__client, self._cluster_info['storage_pool_config'])
+        else:
+            self.__storage_pool = buttlib.libvirt.storage.get(self.__client, self._cluster_info['storage_pool_config']['name'])
+        # create the network
+        if not buttlib.libvirt.networks.exists(self.__client, self._cluster_info['network_config']['name']):
+            self.__network = buttlib.libvirt.networks.create(self.__client, self._cluster_info['network_config'])
+        else:
+            self.__network = buttlib.libvirt.networks.get(self.__client, self._cluster_info['network_config']['name'])
+
+    def __create_volume(self, hostname, size):
+        __vol_name = hostname + ".img"
+        __volume_config = {
+            "name": __vol_name,
+            "full_path": "{}/{}".format(self._cluster_info['buttdir'], __vol_name),
+            "size": os.path.getsize(self._cluster_info['base_image'])
+        }
+        # create a new volume
+        buttlib.libvirt.volumes.import_image(self.__client, self.__storage_pool, self._cluster_info['base_image'], __volume_config)
+        # size it correctly
+        __final_size = size * 1024000000
+        if __final_size > __volume_config['size']:
+            __volume_config['size'] = __final_size
+            buttlib.libvirt.volumes.resize_image(self.__client, self.__storage_pool, __volume_config)
+
+    def __create_vm(self, instance_config):
+        """create a new instance in libvirt"""
+        self.__create_volume(instance_config['hostname'], instance_config['disk'])
+        __ign_filename = "{}/{}.ign".format(self._cluster_info['buttdir'], instance_config['hostname'])
+        buttlib.libvirt.instances.create()
+        # cmd = Builder.__LIBVIRT_CREATE_TMPLT__.format(**instance_config, ignition_file=filename)
+        # result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
+        # print(result.stdout)
 
     def build(self):
         """Gathers up config and calls various functions to create a kubernetes cluster"""
-        self.__ssl_helper.createCerts(self._kube_masters.ips, self._cluster_info["cluster_ip"], self._kube_masters.hostnames)
-        # __vm_initial_configs = self.generate_vm_configs()
-        buttlib.common.fetch_coreos_image(self._cluster_info['buttdir'], self._env_info['coreosChannel'], self.__coreos_image_name_zipped)
-        return
-        self.create_storage_pool()
-        self.create_butt_network(__vm_initial_configs)
+        self.__pre_build()
         for hostname, ip in self._kube_masters.masters:
-            vm_config = self.generate_master_config(hostname, ip)
-            self.create_vm(vm_config, 'master')
-        for hostname, ip in self._kube_workers.workers:
-            self.create_vm(vm_config, 'worker')
+            bic = buttlib.common.ButtInstanceConfig(hostname, ip, 'masters', self._ssl_helper, self._env_info, self._cluster_info)
+            bic.write_ign()
+            self.__create_vm(bic.instance_config)
+        # for hostname, ip in self._kube_workers.workers:
+        #     bic = buttlib.common.ButtInstanceConfig(hostname, ip, 'workers', self._ssl_helper, self._env_info, self._cluster_info['kube_master_lb_ip'])
+        #     print(bic.instance_config)
+        #     self.create_vm(vm_config, 'worker')
 
-    def create_vm(self, vm_config, vm_role):
-        """Use subprocess/virt-install to create/start a vm in libvirt"""
-        self.create_volume(vm_config)
-        # self.create_user_data(vm_config, vm_role)
-        ign = buttlib.helpers.IgnitionBuilder(
-             replacements_dict={**self._env_info, **self._cluster_info, **vm_config},
-             exclude_modules=vm_config['exclude_modules']).get_ignition()
-        filename = "{}/{}.ign".format(self._cluster_info['buttdir'], vm_config['hostname'])
-        with open(filename, "w+b") as fp:
-            fp.write(ign.encode())
-            fp.seek(0)
-            # os.chmod(fp.name, stat.S_IROTH)
-            cmd = Builder.__LIBVIRT_CREATE_TMPLT__.format(**vm_config, ignition_file=filename)
-            result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
-            print(result.stdout)
+    # def generate_master_config(self, hostname, ip):
+    #     self._ssl_helper.generateHost(hostname, ip)
+    #     vm_config = {
+    #         "hostname": hostname,
+    #         "mac": buttlib.common.random_mac(),
+    #         "ip": ip,
+    #         "disk": self._env_info['masters']['disk'],
+    #         "butt_net": self._cluster_info['network_name'],
+    #         "butt_dir": self._cluster_info['buttdir'],
+    #         "ram": self._env_info['masters']['ram'],
+    #         "libvirt_uri": self.__libvirt_uri,
+    #         "cpus": self._env_info['masters']['cpus'],
+    #         "kubeletRegistration": "--register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule",
+    #         "clusterRole": "master",
+    #         "additionalLabels": "",
+    #         "etcdProxy": "off",
+    #         "exclude_modules": [
+    #             "etcd-gateway"
+    #         ],
+    #         "kubeAPIServer": "http://127.0.0.1:8080",
+    #         "host_pem": self._ssl_helper.getInfo()["{}_pem".format(hostname)],
+    #         "host_key": self._ssl_helper.getInfo()["{}_key".format(hostname)],
+    #         "api_pem": self._ssl_helper.getInfo()["api_pem"],
+    #         "api_key": self._ssl_helper.getInfo()["api_key"],
+    #         "ca_pem": self._ssl_helper.getInfo()["ca_pem"],
+    #         "ca_key": self._ssl_helper.getInfo()["ca_key"]
+    #     }
+    #     return vm_config
 
-    def generate_master_config(self, hostname, ip):
-        self.__ssl_helper.generateHost(hostname, ip)
-        vm_config = {
-            "hostname": hostname,
-            "mac": buttlib.common.random_mac(),
-            "ip": ip,
-            "disk": self._env_info['masters']['disk'],
-            "butt_net": self._cluster_info['network_name'],
-            "butt_dir": self._cluster_info['buttdir'],
-            "ram": self._env_info['masters']['ram'],
-            "libvirt_uri": self.__libvirt_uri,
-            "cpus": self._env_info['masters']['cpus'],
-            "kubeletRegistration": "--register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule",
-            "clusterRole": "master",
-            "additionalLabels": "",
-            "etcdProxy": "off",
-            "exclude_modules": [
-                "etcd-gateway"
-            ],
-            "kubeAPIServer": "http://127.0.0.1:8080",
-            "host_pem": self.__ssl_helper.getInfo()["{}_pem".format(hostname)],
-            "host_key": self.__ssl_helper.getInfo()["{}_key".format(hostname)],
-            "api_pem": self.__ssl_helper.getInfo()["api_pem"],
-            "api_key": self.__ssl_helper.getInfo()["api_key"],
-            "ca_pem": self.__ssl_helper.getInfo()["ca_pem"],
-            "ca_key": self.__ssl_helper.getInfo()["ca_key"]
-        }
-        return vm_config
-
-    def generate_worker_config(self):
-        """ return a dict with config for a worker vm"""
-        hostname = "kube-worker-{}-{}".format(
-            self._cluster_info['cluster_name'], buttlib.common.random_hostname_suffix())
-        host_ip = self.get_random_worker_ip()
-        self.__ssl_helper.generateHost(hostname, host_ip)
-        vm_config = {
-            'hostname': hostname,
-            "mac": self.random_mac(),
-            "ip": host_ip,
-            "disk": self._env_info['workers']['disk'],
-            "butt_net": self._cluster_info['network_name'],
-            "butt_dir": self._cluster_info['buttdir'],
-            "ram": self._env_info['workers']['ram'],
-            "libvirt_uri": self.__libvirt_uri,
-            "cpus": self._env_info['workers']['cpus'],
-            "kubeletRegistration": "--register-node=true",
-            "clusterRole": "worker",
-            "additionalLabels": "",
-            "etcdProxy": "on",
-            "kubeAPIServer": "https://{}:443".format(self._cluster_info['kube_master']),
-            "exclude_modules": [
-                "kube-apiserver",
-                "kube-controller-manager",
-                "addon-manager",
-                "kube-scheduler",
-                "etcd"
-            ],
-            "host_pem": self.__ssl_helper.getInfo()["{}_pem".format(hostname)],
-            "host_key": self.__ssl_helper.getInfo()["{}_key".format(hostname)],
-            "api_pem": self.__ssl_helper.getInfo()["api_pem"],
-            "api_key": self.__ssl_helper.getInfo()["api_key"],
-            "ca_pem": self.__ssl_helper.getInfo()["ca_pem"],
-            "ca_key": self.__ssl_helper.getInfo()["ca_key"]
-        }
-        return vm_config
+    # def generate_worker_config(self):
+    #     """ return a dict with config for a worker vm"""
+    #     hostname = "kube-worker-{}-{}".format(
+    #         self._cluster_info['cluster_name'], buttlib.common.random_hostname_suffix())
+    #     host_ip = self.get_random_worker_ip()
+    #     self._ssl_helper.generateHost(hostname, host_ip)
+    #     vm_config = {
+    #         'hostname': hostname,
+    #         "mac": self.random_mac(),
+    #         "ip": host_ip,
+    #         "disk": self._env_info['workers']['disk'],
+    #         "butt_net": self._cluster_info['network_name'],
+    #         "butt_dir": self._cluster_info['buttdir'],
+    #         "ram": self._env_info['workers']['ram'],
+    #         "libvirt_uri": self.__libvirt_uri,
+    #         "cpus": self._env_info['workers']['cpus'],
+    #         "kubeletRegistration": "--register-node=true",
+    #         "clusterRole": "worker",
+    #         "additionalLabels": "",
+    #         "etcdProxy": "on",
+    #         "kubeAPIServer": "https://{}:443".format(self._cluster_info['kube_master']),
+    #         "exclude_modules": [
+    #             "kube-apiserver",
+    #             "kube-controller-manager",
+    #             "addon-manager",
+    #             "kube-scheduler",
+    #             "etcd"
+    #         ],
+    #         "host_pem": self._ssl_helper.getInfo()["{}_pem".format(hostname)],
+    #         "host_key": self._ssl_helper.getInfo()["{}_key".format(hostname)],
+    #         "api_pem": self._ssl_helper.getInfo()["api_pem"],
+    #         "api_key": self._ssl_helper.getInfo()["api_key"],
+    #         "ca_pem": self._ssl_helper.getInfo()["ca_pem"],
+    #         "ca_key": self._ssl_helper.getInfo()["ca_key"]
+    #     }
+    #     return vm_config
 
     # def generate_vm_configs(self):
     #     """ returns list of dicts used to configure indvidual virtual machines
@@ -188,64 +230,64 @@ class Builder(buttlib.common.ButtBuilder):
     #         stdout=subprocess.PIPE,
     #         universal_newlines=True)
 
-    def create_volume(self, vm_config):
-        """ Expects configuration dict for a virtual machines
-            uses subprocess and qemu-img to create and resize an image"""
-        result = subprocess.run(
-            [
-                "qemu-img", "create", "-f", "qcow2", "-b",
-                "%s/%s" % (self._cluster_info['buttdir'],
-                           self.__coreos_image_name),
-                "%s/%s.qcow2" % (self._cluster_info['buttdir'],
-                                 vm_config['hostname'])
-            ],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-        print(result.stdout)
-        if vm_config['disk'] > 8:
-            size = vm_config['disk'] - 8
-            result = subprocess.run(
-                [
-                    "sudo", "qemu-img", "resize",
-                    "%s/%s.qcow2" % (self._cluster_info['buttdir'],
-                                     vm_config['hostname']),
-                    "+%iG" % (size)
-                ],
-                stdout=subprocess.PIPE,
-                universal_newlines=True)
-            print(result.stdout)
+    # def create_volume(self, vm_config):
+    #     """ Expects configuration dict for a virtual machines
+    #         uses subprocess and qemu-img to create and resize an image"""
+    #     result = subprocess.run(
+    #         [
+    #             "qemu-img", "create", "-f", "qcow2", "-b",
+    #             "%s/%s" % (self._cluster_info['buttdir'],
+    #                        self.__coreos_image_name),
+    #             "%s/%s.qcow2" % (self._cluster_info['buttdir'],
+    #                              vm_config['hostname'])
+    #         ],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #     print(result.stdout)
+    #     if vm_config['disk'] > 8:
+    #         size = vm_config['disk'] - 8
+    #         result = subprocess.run(
+    #             [
+    #                 "sudo", "qemu-img", "resize",
+    #                 "%s/%s.qcow2" % (self._cluster_info['buttdir'],
+    #                                  vm_config['hostname']),
+    #                 "+%iG" % (size)
+    #             ],
+    #             stdout=subprocess.PIPE,
+    #             universal_newlines=True)
+    #         print(result.stdout)
 
-    def create_user_data(self, vm_config, vm_role):
-        """Creates and writes out user data specific to given vm config"""
-        uddir = "%s/%s/openstack/latest" % (self._cluster_info['buttdir'],
-                                            vm_config['hostname'])
-        if not os.path.exists(uddir):
-            os.makedirs(uddir)
-        ud_dict = {
-            "kube_addons": yaml.dump(self._cluster_info['kube_addons']) % {
-                **
-                vm_config,
-                **
-                self._env_info,
-                **
-                self._cluster_info
-            },
-            "kube_manifests":
-            yaml.dump(self._cluster_info['kube_manifests'][vm_role]) % {
-                **
-                vm_config,
-                **
-                self._env_info,
-                **
-                self._cluster_info
-            },
-        }
-        with open("%s/user_data" % (uddir), 'w') as file:
-            file.write(self._cluster_info['user_data_tmpl'][vm_role] %
-                       {**vm_config, **self._env_info,
-                        **self._cluster_info,
-                        **(self.__ssl_helper.getInfo()),
-                        **ud_dict})
+    # def create_user_data(self, vm_config, vm_role):
+    #     """Creates and writes out user data specific to given vm config"""
+    #     uddir = "%s/%s/openstack/latest" % (self._cluster_info['buttdir'],
+    #                                         vm_config['hostname'])
+    #     if not os.path.exists(uddir):
+    #         os.makedirs(uddir)
+    #     ud_dict = {
+    #         "kube_addons": yaml.dump(self._cluster_info['kube_addons']) % {
+    #             **
+    #             vm_config,
+    #             **
+    #             self._env_info,
+    #             **
+    #             self._cluster_info
+    #         },
+    #         "kube_manifests":
+    #         yaml.dump(self._cluster_info['kube_manifests'][vm_role]) % {
+    #             **
+    #             vm_config,
+    #             **
+    #             self._env_info,
+    #             **
+    #             self._cluster_info
+    #         },
+    #     }
+    #     with open("%s/user_data" % (uddir), 'w') as file:
+    #         file.write(self._cluster_info['user_data_tmpl'][vm_role] %
+    #                    {**vm_config, **self._env_info,
+    #                     **self._cluster_info,
+    #                     **(self._ssl_helper.getInfo()),
+    #                     **ud_dict})
 
     # def create_storage_pool(self):
     #     """ create a libvirt storage pool"""

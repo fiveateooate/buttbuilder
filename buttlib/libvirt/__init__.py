@@ -6,7 +6,8 @@ from buttlib.libvirt.storage import (
     get,
     list,
     create,
-    delete
+    delete,
+    exists
 )
 from buttlib.libvirt.volumes import (
     get,
@@ -19,6 +20,7 @@ from buttlib.libvirt.networks import (
     list,
     create,
     delete,
+    exists,
     dhcp_add,
     dhcp_delete
 )

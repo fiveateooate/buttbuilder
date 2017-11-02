@@ -1,0 +1,101 @@
+"""hold config and whatevers for instance"""
+
+import buttlib
+import pprint
+
+
+class ButtInstanceConfig(object):
+    __DEFAULT_EXCLUDE_MODULES__ = {
+        "masters": [
+            "etcd-gateway"
+        ],
+        "workers": [
+            "kube-apiserver",
+            "kube-controller-manager",
+            "addon-manager",
+            "kube-scheduler",
+            "etcd"
+        ]
+    }
+    ___ALLOWED_ROLES__ = ['masters', 'workers']
+
+    # the whole point of this is to create the ign
+    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, exclude_modules=[], provider_additional={}):
+        if role not in ButtInstanceConfig.___ALLOWED_ROLES__:
+            raise buttlib.exceptions.UnknownRoleError(role)
+        __exclude_modules = exclude_modules if exclude_modules else ButtInstanceConfig.__DEFAULT_EXCLUDE_MODULES__[role]
+        ssl_helper.generateHost(hostname, ip)
+        self.__buttdir = cluster_info['buttdir']
+        self.__instance_config = {
+            "hostname": hostname,
+            "mac": buttlib.common.random_mac(),
+            "ip": ip,
+            "disk": env_info[role]['disk'],
+            "ram": env_info[role]['ram'],
+            "cpus": env_info[role]['cpus'],
+            "additionalLabels": "",
+            "exclude_modules": __exclude_modules,
+            "host_pem": ssl_helper.getInfo()["{}_pem".format(hostname)],
+            "host_key": ssl_helper.getInfo()["{}_key".format(hostname)],
+            "api_pem": ssl_helper.getInfo()["api_pem"],
+            "api_key": ssl_helper.getInfo()["api_key"],
+            "ca_pem": ssl_helper.getInfo()["ca_pem"],
+            "ca_key": ssl_helper.getInfo()["ca_key"],
+            "ign": ""
+        }
+        # set role specific stuff, if bad role given fail constructor
+        if role == 'masters':
+            self.__instance_config.update({
+                "kubeletRegistration": "--register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule",
+                "kubeAPIServer": "http://127.0.0.1:8080",
+                "etcdProxy": "off",
+                "clusterRole": "master",
+            })
+        elif role == 'workers':
+            self.__instance_config.update({
+                "kubeletRegistration": "--register-node=true",
+                "etcdProxy": "on",
+                "kubeAPIServer": "https://{}:443".format(cluster_info['kube_master_lb_ip']),
+                "clusterRole": "worker"
+            })
+        # append a dict of provider specific config - maybe if I did this right not needed?
+        if provider_additional is not {}:
+            self.__instance_config.update(provider_additional)
+        # now that all the info is set lets make an ignition
+        __replacements_dict = {**env_info, **cluster_info, **self.__instance_config}
+        self.__instance_config['ign'] = buttlib.helpers.IgnitionBuilder(
+            replacements_dict=__replacements_dict,
+            exclude_modules=__exclude_modules
+        ).get_ignition()
+
+    @property
+    def instance_config(self):
+        return self.__instance_config
+
+    @instance_config.setter
+    def instance_config(self, value):
+        self.__instance_config = value
+
+    @property
+    def ign(self):
+        return self.__instance_config['ign']
+
+    def write_ign(self):
+        filename = "{}/{}.ign".format(self.__buttdir, self.__instance_config['hostname'])
+        with open(filename, "w+b") as fp:
+            fp.write(self.__instance_config['ign'].encode())
+
+    # these don't belong here
+    # comment to remind me
+    def make_awsy(self):
+        # do soemthing with ign to make it work in aws
+        pass
+
+    def make_gcey(self):
+        # make ign work on gce
+        pass
+
+    # or could I do something like ?
+    def convert_ign_for_provider(self, provider, function):
+        # buttlib.provider.function()
+        pass

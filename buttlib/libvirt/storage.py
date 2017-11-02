@@ -18,11 +18,11 @@ xmldesc_tmplt = """
 
 
 def get(client, name):
-    pool = None
     try:
         pool = client.connection.storagePoolLookupByName(name)
     except libvirt.libvirtError as exc:
         print(exc)
+        pool = None
     return pool
 
 
@@ -36,16 +36,15 @@ def list(client):
 
 
 def create(client, storage_config):
-    pool = []
-    if not get(client, storage_config['name']):
-        try:
-            poolXML = xmldesc_tmplt.format(**storage_config)
-            pool = client.connection.storagePoolDefineXML(poolXML, 0)
-            pool.create()
-            if 'autostart' in storage_config and storage_config['autostart']:
-                pool.setAutostart(1)
-        except libvirt.libvirtError as exc:
-            print(exc)
+    try:
+        poolXML = xmldesc_tmplt.format(**storage_config)
+        pool = client.connection.storagePoolDefineXML(poolXML, 0)
+        pool.create()
+        if 'autostart' in storage_config and storage_config['autostart']:
+            pool.setAutostart(1)
+    except libvirt.libvirtError as exc:
+        print(exc)
+        pool = None
     return pool
 
 
@@ -61,3 +60,13 @@ def delete(client, name):
         print(exc)
         retval = False
     return retval
+
+
+def exists(client, name):
+    exists = False
+    pools = list(client)
+    for pool in pools:
+        if pool.name() == name:
+            exists = True
+            break
+    return exists

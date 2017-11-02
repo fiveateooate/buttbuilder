@@ -39,6 +39,7 @@ def list(client, pool):
 
 def create(client, pool, volume_config):
     try:
+        handle_exists(client, pool, volume_config['name'])
         vol_xml = vol_xml_tmplt.format(**volume_config)
         vol = pool.createXML(vol_xml, 0)
     except libvirt.libvirtError as exc:
@@ -65,6 +66,7 @@ def handler(stream, data, file_):
 
 def import_image(client, pool, image, volume_config):
     try:
+        handle_exists(client, pool, volume_config['name'])
         vol_xml = vol_xml_tmplt.format(**volume_config)
         vol = pool.createXML(vol_xml, 0)
         with open(image, 'rb') as file:
@@ -87,3 +89,13 @@ def resize_image(client, pool, volume_config):
         print(exc)
         retval = False
     return retval
+
+
+def handle_exists(client, pool, name):
+    overwrite = 'n'
+    for volume in list(client, pool):
+        if volume.name() == name:
+            overwrite = input("{} exists, overwrite? (y|n) ".format(name))
+            break
+    if overwrite == 'y':
+        delete(client, pool, name)

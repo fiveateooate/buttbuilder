@@ -11,7 +11,7 @@ from sh import ct
 
 
 class IgnitionBuilder:
-    def __init__(self, basedir="ignition", replacements_dict=[], exclude_modules=[]):
+    def __init__(self, basedir="ignition", replacements_dict={}, exclude_modules=[]):
         self.__exclude_modules = exclude_modules
         self.__config = self.__build_config(basedir, basedir, {}, replacements_dict)
 
@@ -24,7 +24,7 @@ class IgnitionBuilder:
                 if config[tail] == {}:
                     del(config[tail])
             elif re.search("\.yaml$", dir_item):
-                #print("processing {}".format(dir_item))
+                # print("processing {}".format(dir_item))
                 # skip ignored modules - used for master/worker diffs
                 if tail.replace(".yaml", "") in self.__exclude_modules:
                     continue
