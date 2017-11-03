@@ -1,5 +1,7 @@
 """libvirt instance/vm functions"""
 
+import libvirt
+
 
 # Guess I am just going with the stupid template xml shit and replacement dict
 # the xmlns crap is for sure needed for the qemu command line stuff to work
@@ -7,7 +9,7 @@
 dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
   <name>{hostname}</name>
   <memory unit='MiB'>{ram}</memory>
-  <vcpu placement='static'>{cpu}</vcpu>
+  <vcpu placement='static'>{cpus}</vcpu>
   <os>
     <type arch='x86_64'>hvm</type>
     <boot dev='hd'/>
@@ -28,11 +30,11 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
   <devices>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='{image_path}'/>
+      <source file='{buttdir}/{hostname}.{image_type}'/>
       <target dev='hda' bus='virtio'/>
     </disk>
     <interface type='network'>
-      <mac address='{mac}}'/>
+      <mac address='{mac}'/>
       <source network='{network_name}'/>
       <model type='virtio'/>
     </interface>
@@ -54,7 +56,7 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
   </devices>
    <qemu:commandline>
      <qemu:arg value='-fw_cfg'/>
-     <qemu:arg value='name=opt/com.coreos/config,file={ign_path}'/>
+     <qemu:arg value='name=opt/com.coreos/config,file={buttdir}/{hostname}.ign'/>
    </qemu:commandline>
 </domain>
 """
@@ -72,7 +74,7 @@ def create(client, instance_config):
     try:
         dom_xml = dom_xml_tmplt.format(**instance_config)
         domain = client.connection.defineXML(dom_xml)
-        domain.create()
+        domain.start()
     except libvirt.libvirtError as exc:
         print(exc)
         dom = None

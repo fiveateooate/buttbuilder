@@ -64,8 +64,8 @@ class TestLibvirtVolumes():
         self.default_pool = buttlib.libvirt.storage.get(self.client, 'default')
         buttlib.common.fetch_coreos_image(os.getcwd())
 
-    def teardown_class(self):
-        buttlib.libvirt.storage.delete(self.client, self.args['storage_config']['name'])
+    # def teardown_class(self):
+    #     buttlib.libvirt.storage.delete(self.client, self.args['storage_config']['name'])
 
     def test_volume_list_default(self):
         result = buttlib.libvirt.volumes.list(self.client, self.default_pool)

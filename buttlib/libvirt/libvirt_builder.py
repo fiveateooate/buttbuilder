@@ -12,20 +12,6 @@ import buttlib
 
 
 class Builder(buttlib.common.ButtBuilder):
-    """ Libvrit module for buttbuilder """
-    __LIBVIRT_CREATE_TMPLT__ = """virt-install --connect {libvirt_uri} \
---import \
---name {hostname} \
---ram {ram} \
---vcpus {cpus} \
---os-type=linux \
---os-variant=generic \
---disk path={butt_dir}/{hostname}.qcow2,format=qcow2,bus=virtio \
---qemu-commandline="-fw_cfg name=opt/com.coreos/config,file={ignition_file}" \
---vnc \
---noautoconsole \
---network network={butt_net},model=virtio,mac={mac}"""
-
     def __init__(self, env_info, args):
         print("NOTE: sudo will be used to interact with libvirt")
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
@@ -36,6 +22,7 @@ class Builder(buttlib.common.ButtBuilder):
         # self.__coreos_image_name = "coreos_production_qemu_image.img"
         # add some libvirt specific crap
         self._cluster_info.update({
+            "image_type": "qcow2",
             'network_config': {
                 "name": self._cluster_info['cluster_name'] + "-net",
                 "ip": self._butt_ips.get_ip(1),
@@ -74,7 +61,7 @@ class Builder(buttlib.common.ButtBuilder):
             self.__network = buttlib.libvirt.networks.get(self.__client, self._cluster_info['network_config']['name'])
 
     def __create_volume(self, hostname, size):
-        __vol_name = hostname + ".img"
+        __vol_name = hostname + "." + self._cluster_info['image_type']
         __volume_config = {
             "name": __vol_name,
             "full_path": "{}/{}".format(self._cluster_info['buttdir'], __vol_name),
@@ -91,17 +78,30 @@ class Builder(buttlib.common.ButtBuilder):
     def __create_vm(self, instance_config):
         """create a new instance in libvirt"""
         self.__create_volume(instance_config['hostname'], instance_config['disk'])
-        __ign_filename = "{}/{}.ign".format(self._cluster_info['buttdir'], instance_config['hostname'])
-        buttlib.libvirt.instances.create()
-        # cmd = Builder.__LIBVIRT_CREATE_TMPLT__.format(**instance_config, ignition_file=filename)
-        # result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
-        # print(result.stdout)
+        __dhcp_config = {
+            "network_name": instance_config['network_name'],
+            "ip": instance_config['ip'],
+            "mac": instance_config['mac'],
+            "hostname": instance_config['hostname']
+        }
+        buttlib.libvirt.networks.dhcp_add(self.__client, __dhcp_config)
+        buttlib.libvirt.instances.create(self.__client, instance_config)
 
     def build(self):
         """Gathers up config and calls various functions to create a kubernetes cluster"""
         self.__pre_build()
+        provider_additional = {"image_type": self._cluster_info['image_type']}
         for hostname, ip in self._kube_masters.masters:
-            bic = buttlib.common.ButtInstanceConfig(hostname, ip, 'masters', self._ssl_helper, self._env_info, self._cluster_info)
+            bic = buttlib.common.ButtInstanceConfig(
+                hostname,
+                ip,
+                'masters',
+                self._ssl_helper,
+                self._env_info,
+                self._cluster_info,
+                provider_additional=provider_additional
+            )
+            # write out the config
             bic.write_ign()
             self.__create_vm(bic.instance_config)
         # for hostname, ip in self._kube_workers.workers:

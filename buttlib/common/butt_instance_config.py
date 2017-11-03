@@ -20,7 +20,7 @@ class ButtInstanceConfig(object):
     ___ALLOWED_ROLES__ = ['masters', 'workers']
 
     # the whole point of this is to create the ign
-    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, exclude_modules=[], provider_additional={}):
+    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, exclude_modules=[], provider_additional=None):
         if role not in ButtInstanceConfig.___ALLOWED_ROLES__:
             raise buttlib.exceptions.UnknownRoleError(role)
         __exclude_modules = exclude_modules if exclude_modules else ButtInstanceConfig.__DEFAULT_EXCLUDE_MODULES__[role]
@@ -28,6 +28,7 @@ class ButtInstanceConfig(object):
         self.__buttdir = cluster_info['buttdir']
         self.__instance_config = {
             "hostname": hostname,
+            "buttdir": cluster_info['buttdir'],
             "mac": buttlib.common.random_mac(),
             "ip": ip,
             "disk": env_info[role]['disk'],
@@ -41,7 +42,8 @@ class ButtInstanceConfig(object):
             "api_key": ssl_helper.getInfo()["api_key"],
             "ca_pem": ssl_helper.getInfo()["ca_pem"],
             "ca_key": ssl_helper.getInfo()["ca_key"],
-            "ign": ""
+            "ign": "",
+            "network_name": cluster_info['network_name']
         }
         # set role specific stuff, if bad role given fail constructor
         if role == 'masters':
@@ -59,7 +61,7 @@ class ButtInstanceConfig(object):
                 "clusterRole": "worker"
             })
         # append a dict of provider specific config - maybe if I did this right not needed?
-        if provider_additional is not {}:
+        if provider_additional is not None:
             self.__instance_config.update(provider_additional)
         # now that all the info is set lets make an ignition
         __replacements_dict = {**env_info, **cluster_info, **self.__instance_config}

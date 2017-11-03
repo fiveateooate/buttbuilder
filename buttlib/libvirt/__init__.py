@@ -24,3 +24,6 @@ from buttlib.libvirt.networks import (
     dhcp_add,
     dhcp_delete
 )
+from buttlib.libvirt.instances import (
+    create
+)
