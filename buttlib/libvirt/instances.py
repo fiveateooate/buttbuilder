@@ -1,8 +1,7 @@
 """libvirt instance/vm functions"""
 
 import libvirt
-
-
+import time
 # Guess I am just going with the stupid template xml shit and replacement dict
 # the xmlns crap is for sure needed for the qemu command line stuff to work
 # maybe some stuff could be dropped, but tried to delete what I knew I could
@@ -63,18 +62,30 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
 
 
 def get(client, name):
-    pass
+    try:
+        dom = client.connection.lookupByName(name)
+    except libvirt.libvirtError as exc:
+        print(exc)
+        dom = None
+    return dom
 
 
 def list(client):
-    pass
+    try:
+        doms = client.connection.listAllDomains()
+    except libvirt.libvirtError as exc:
+        print(exc)
+        doms = []
+    return doms
 
 
 def create(client, instance_config):
     try:
         dom_xml = dom_xml_tmplt.format(**instance_config)
-        domain = client.connection.defineXML(dom_xml)
-        domain.start()
+        client.connection.defineXML(dom_xml)
+        time.sleep(2)  # domain will run but looks paused if you don't sleep a bit
+        domain = get(client, instance_config['hostname'])
+        domain.create()
     except libvirt.libvirtError as exc:
         print(exc)
         dom = None

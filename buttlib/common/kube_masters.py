@@ -2,10 +2,11 @@
 
 
 class KubeMasters(object):
-    def __init__(self, count, butt_ips, cluster_name, use_ips=False, ip_offset=0, hostname_format_override=None, etcd_port=2379):
+    def __init__(self, count, butt_ips, cluster_name, use_ips=False, ip_offset=0, hostname_format_override=None, etcd_client_port=2379, etcd_peer_port=2380):
         self.__hostname_format = hostname_format_override if hostname_format_override else "kube-master-{cluster_name}-{index:02d}"
         self.__cluster_name = cluster_name
-        self.__etcd_port = etcd_port
+        self.__etcd_peer_port = etcd_peer_port
+        self.__etcd_client_port = etcd_client_port
         self.__count = count
         self.__use_ips = use_ips
         self.__butt_ips = butt_ips
@@ -34,34 +35,34 @@ class KubeMasters(object):
 
     @property
     def etcd_initial_cluster_string(self):
-        fmt = "{hostname}=http://{hostname}:{etcd_port}"
+        fmt = "{hostname}=http://{hostname}:{etcd_peer_port}"
         if self.__use_ips:
-            fmt = "{hostname}=http://{ip}:{etcd_port}"
-        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_port=self.__etcd_port) for hostname, ip in self.masters_addrs()])
+            fmt = "{hostname}=http://{ip}:{etcd_peer_port}"
+        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_peer_port=self.__etcd_peer_port) for hostname, ip in self.masters_addrs()])
 
     @property
     def k8s_masters_string(self):
         """:returns: list - k8s api endpoints"""
-        fmt = "https://{hostname}"
+        fmt = "http://{hostname}"
         if self.__use_ips:
-            fmt = "https://{ip}"
+            fmt = "http://{ip}"
         return ','.join([fmt.format(hostname=hostname, ip=ip) for hostname, ip in self.masters_addrs()])
 
     # etcd hosts with proto
     @property
     def etcd_hosts_string(self):
-        fmt = "http://{hostname}:{etcd_port}"
+        fmt = "http://{hostname}:{etcd_client_port}"
         if self.__use_ips:
-            fmt = "http://{ip}:{etcd_port}"
-        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_port=self.__etcd_port) for hostname, ip in self.masters_addrs()])
+            fmt = "http://{ip}:{etcd_client_port}"
+        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_client_port=self.__etcd_client_port) for hostname, ip in self.masters_addrs()])
 
     # No proto - needed somewhere
     @property
     def etcd_endpoints_string(self):
-        fmt = "{hostname}:{etcd_port}"
+        fmt = "{hostname}:{etcd_client_port}"
         if self.__use_ips:
-            fmt = "{ip}:{etcd_port}"
-        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_port=self.__etcd_port) for hostname, ip in self.masters_addrs()])
+            fmt = "{ip}:{etcd_client_port}"
+        return ','.join([fmt.format(hostname=hostname, ip=ip, etcd_client_port=self.__etcd_client_port) for hostname, ip in self.masters_addrs()])
 
     @property
     def ips(self):

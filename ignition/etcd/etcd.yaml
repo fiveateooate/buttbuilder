@@ -6,5 +6,5 @@ listen_client_urls:          "http://0.0.0.0:2379"
 listen_peer_urls:            "http://{ip}:2380"
 initial_cluster:             "{etcd_initial_cluster}"
 proxy:                       "{etcdProxy}"
-auto_tls:                    true
-peer_auto_tls:               true
+#auto_tls:                    true
+#peer_auto_tls:               true

@@ -1,7 +1,10 @@
 """libvirt network functions"""
 
 import libvirt
+from xml.dom import minidom
 
+
+__UPDATE_FLAGS = libvirt.VIR_NETWORK_UPDATE_AFFECT_CURRENT
 
 xmldesc_tmplt = """<network>
   <name>{name}</name>
@@ -86,7 +89,9 @@ def dhcp_add(client, dhcp_config):
         network = get(client, dhcp_config['network_name'])
         if network:
             dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
-            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_ADD_LAST, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml)
+            # call delete just in case
+            dhcp_delete_by_name(client, dhcp_config)
+            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_ADD_LAST, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml, __UPDATE_FLAGS)
             retval = True
     except libvirt.libvirtError as exc:
         print(exc)
@@ -99,8 +104,30 @@ def dhcp_delete(client, dhcp_config):
         network = get(client, dhcp_config['network_name'])
         if network:
             dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
-            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_DELETE, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml)
+            network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_DELETE, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml, __UPDATE_FLAGS)
             retval = True
+    except libvirt.libvirtError as exc:
+        print(exc)
+    return retval
+
+
+def dhcp_delete_by_name(client, dhcp_config):
+    retval = False
+    try:
+        network = get(client, dhcp_config['network_name'])
+        if network:
+            network_xml = minidom.parseString(network.XMLDesc())
+            dhcp_entries = network_xml.getElementsByTagName("host")
+            for entry in dhcp_entries:
+                if entry.attributes['name'].value == dhcp_config['hostname']:
+                    tmp_dhcp_config = {
+                        "hostname": entry.attributes['name'].value,
+                        "ip": entry.attributes['ip'].value,
+                        "mac": entry.attributes['mac'].value,
+                        "network_name": dhcp_config['network_name']
+                    }
+                    retval = dhcp_delete(client, tmp_dhcp_config)
+                    break
     except libvirt.libvirtError as exc:
         print(exc)
     return retval

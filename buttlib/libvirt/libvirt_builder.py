@@ -104,10 +104,18 @@ class Builder(buttlib.common.ButtBuilder):
             # write out the config
             bic.write_ign()
             self.__create_vm(bic.instance_config)
-        # for hostname, ip in self._kube_workers.workers:
-        #     bic = buttlib.common.ButtInstanceConfig(hostname, ip, 'workers', self._ssl_helper, self._env_info, self._cluster_info['kube_master_lb_ip'])
-        #     print(bic.instance_config)
-        #     self.create_vm(vm_config, 'worker')
+        for hostname, ip in self._kube_workers.workers:
+            bic = buttlib.common.ButtInstanceConfig(
+                hostname,
+                ip,
+                'workers',
+                self._ssl_helper,
+                self._env_info,
+                self._cluster_info,
+                provider_additional=provider_additional
+            )
+            bic.write_ign()
+            self.__create_vm(bic.instance_config)
 
     # def generate_master_config(self, hostname, ip):
     #     self._ssl_helper.generateHost(hostname, ip)

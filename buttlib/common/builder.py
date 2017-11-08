@@ -56,6 +56,13 @@ class ButtBuilder(object):
             ip_offset=__master_ip_offset,
             use_ips=use_ips
         )
+        self._kube_workers = buttlib.common.KubeWorkers(
+            count=self._env_info['workers']['nodes'],
+            cluster_name=__cluster_name,
+            butt_ips=self._butt_ips,
+            ip_offset=__worker_ip_offset,
+            provider=self._env_info['provider']
+        )
         # huge dict for replacement in ignition files -- created from env_info settings
         self._cluster_info = {
             "cluster_env": args.cluster_env,
