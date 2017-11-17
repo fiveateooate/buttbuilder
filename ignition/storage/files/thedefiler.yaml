@@ -20,7 +20,7 @@
             - name: jenkins-docker-key
             containers:
             - name: thedefiler
-              image: weavelab/ops-thedefiler:v0.3.0
+              image: weavelab/ops-thedefiler:v0.4.0
               imagePullPolicy: Always
               env:
               - name: ETCDHOST

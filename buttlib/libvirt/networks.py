@@ -4,7 +4,7 @@ import libvirt
 from xml.dom import minidom
 
 
-__UPDATE_FLAGS = libvirt.VIR_NETWORK_UPDATE_AFFECT_CURRENT
+__UPDATE_FLAGS = libvirt.VIR_NETWORK_UPDATE_AFFECT_LIVE | libvirt.VIR_NETWORK_UPDATE_AFFECT_CONFIG
 
 xmldesc_tmplt = """<network>
   <name>{name}</name>
@@ -83,6 +83,7 @@ def exists(client, name):
 # 2. section - https://libvirt.org/html/libvirt-libvirt-network.html#virNetworkUpdateSection
 # 3. parentIndex - -1 for don't care
 # 4. xml
+ #5. flags -
 def dhcp_add(client, dhcp_config):
     retval = False
     try:
