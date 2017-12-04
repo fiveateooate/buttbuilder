@@ -27,6 +27,7 @@ class ButtBuilder(object):
         __worker_ip_offset = env_info['workers']['ipOffset'] if 'workers' in env_info and 'ipOffset' in env_info['workers'] else 30
         __buttdir_base = args.buttdir if args.buttdir is not None else os.path.expanduser("~")
         __network_name = env_info['network']['networkName'] if 'network' in env_info and 'networkName' in env_info['network'] else __cluster_name + "-net"
+        __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.1.11'
 
         # create objects used by all builders
         # save env info -- used as dict for replacement in ignition files
@@ -65,7 +66,7 @@ class ButtBuilder(object):
             "cluster_ip": self._cluster_internal_ips.get_ip(1),  # used in ssl certs
             "ssh_pub_keys": __ssh_pub_key_helper.get_pub_keys(),
             "dashboardFQDN": "dashboard-{}.example.com".format(args.cid),
-            "etcdVersion": "3.2.9",
+            "etcdVersion": __etcd_version,
             "etcd_hosts": self._kube_masters.etcd_hosts_string,
             "etcd_initial_cluster": self._kube_masters.etcd_initial_cluster_string,
             "kube_masters": self._kube_masters.k8s_masters_string,

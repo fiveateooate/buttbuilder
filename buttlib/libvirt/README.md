@@ -38,7 +38,7 @@ client.getHostname()                    client.listNWFilters()                  
 ~~~
 
 ## libvirt network functions
-~~~
+~~~shell
 network.DHCPLeases(    network.UUIDString(    network.autostart(     network.c_pointer(     network.create(        network.isActive(      network.name(          network.undefine(
 network.UUID(          network.XMLDesc(       network.bridgeName(    network.connect(       network.destroy(       network.isPersistent(  network.setAutostart(  network.update(
 ~~~

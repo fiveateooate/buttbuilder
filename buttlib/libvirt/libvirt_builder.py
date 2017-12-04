@@ -1,11 +1,6 @@
 """ builder class for libvirt
 """
-# import ipaddress
 import os
-# import stat
-# import random
-# import subprocess
-# import tempfile
 import libvirt
 import yaml
 import buttlib
@@ -13,16 +8,11 @@ import buttlib
 
 class Builder(buttlib.common.ButtBuilder):
     def __init__(self, env_info, args):
-        print("NOTE: sudo will be used to interact with libvirt")
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
-        # self.__libvirt_uri = env_info['libvirtURI']
-        # self._cluster_info['network_name'] = "%s-net" % (self._cluster_info['cluster_name'])
         self.__client = buttlib.libvirt.LibvirtClient(env_info['libvirtURI'])
-        # self.__coreos_image_name_zipped = "coreos_production_qemu_image.img.bz2"
-        # self.__coreos_image_name = "coreos_production_qemu_image.img"
         # add some libvirt specific crap
         self._cluster_info.update({
-            "image_type": "qcow2",
+            "image_type": args.image_format,
             'network_config': {
                 "name": self._cluster_info['cluster_name'] + "-net",
                 "ip": self._butt_ips.get_ip(1),
@@ -117,35 +107,46 @@ class Builder(buttlib.common.ButtBuilder):
             bic.write_ign()
             self.__create_vm(bic.instance_config)
 
-    def add_node(self):
-        """add a node to existing kubernetes cluster"""
-        __vm_config = self.generate_worker_config()
-        self.add_dhcp_entry(__vm_config)
-        self.create_vm(__vm_config, 'worker')
+    # putting verify functions here as they need access to all the configs
+    def verify_vms(self):
+        for dom in buttlib.libvirt.instances.list(self.__client):
+            print("name={}".format(dom.name()))
+        return True
 
-    @staticmethod
-    def delete_vm(vm_name):
-        """deletes a vm from libvirt"""
-        subprocess.run(
-            ["sudo", "virsh", "destroy", vm_name],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
-        subprocess.run(
-            ["sudo", "virsh", "undefine", vm_name],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
+    def verify(self):
+        print("Checking butt state ... ")
+        print("Checking vm's ...")
+        self.verify_vms()
 
-    def remove_node(self, vm_name):
-        """deletes vm from libvirt and libvirt network"""
-        self.delete_vm(vm_name)
-        self.delete_dhcp_entry(vm_name)
-
-    def delete_node(self, node):
-        """delete named node cluster"""
-        pass
-
-    def destroy(self):
-        """tear down entire cluster"""
-        # should ever do???????
-        # self.deleteStorage()
-        pass
+    # def add_node(self):
+    #     """add a node to existing kubernetes cluster"""
+    #     __vm_config = self.generate_worker_config()
+    #     self.add_dhcp_entry(__vm_config)
+    #     self.create_vm(__vm_config, 'worker')
+    #
+    # @staticmethod
+    # def delete_vm(vm_name):
+    #     """deletes a vm from libvirt"""
+    #     subprocess.run(
+    #         ["sudo", "virsh", "destroy", vm_name],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #     subprocess.run(
+    #         ["sudo", "virsh", "undefine", vm_name],
+    #         stdout=subprocess.PIPE,
+    #         universal_newlines=True)
+    #
+    # def remove_node(self, vm_name):
+    #     """deletes vm from libvirt and libvirt network"""
+    #     self.delete_vm(vm_name)
+    #     self.delete_dhcp_entry(vm_name)
+    #
+    # def delete_node(self, node):
+    #     """delete named node cluster"""
+    #     pass
+    #
+    # def destroy(self):
+    #     """tear down entire cluster"""
+    #     # should ever do???????
+    #     # self.deleteStorage()
+    #     pass

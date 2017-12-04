@@ -55,7 +55,7 @@ def network(args, cluster_config_info, builder):
 
 
 def verify(args, cluster_config_info, builder):
-    print("Verifying butt state")
+    builder.verify()
 
 
 if __name__ == '__main__':
@@ -68,11 +68,12 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', '-v', help="verbose", action='store_true')
     # base config
     parser.add_argument('--config', '-c', help="path to cluster_config/yaml file if github is not working", default=None)
-    parser.add_argument('--buttdir', help="directory to store cluster data")
+    parser.add_argument('--buttdir', '-D', help="directory to store cluster data")
+    parser.add_argument('--image_format', '-F', help="image format", default='qcow2')
     # operations
     subparsers = parser.add_subparsers(title="buttbuilder operations", help='do things with butts')
     parser_build = subparsers.add_parser('build', help='Build a butt')
-    # parser_build.add_argument('--createcluster', help='build cluster',action="store_true")
+    parser_build .add_argument('--force', help="Delete and recreate cluster", action="store_true")
     parser_build.set_defaults(func=build)
 
     parser_node = subparsers.add_parser('node', help='Manage butt nodes')
@@ -110,7 +111,8 @@ if __name__ == '__main__':
     os.environ['provider'] = cluster_config_info.env_info['provider']
     import buttlib
 
-    builder_class = getattr(importlib.import_module("buttlib.{provider}.{provider}_builder".format(provider=cluster_config_info.env_info['provider'])), "Builder")
+    builder_class = getattr(importlib.import_module(
+        "buttlib.{provider}.{provider}_builder".format(provider=cluster_config_info.env_info['provider'])), "Builder")
 
     builder = builder_class(cluster_config_info.env_info, args)
     args.func(args, cluster_config_info, builder)
