@@ -236,7 +236,7 @@ class Builder(buttlib.common.ButtBuilder):
                 "name": self._cluster_info['worker_lb_name'],
                 "proto": "tcp",
                 "hcport": "80",
-                "lbports": [80,30000,30012,30014,30016,30656],
+                "lbports": [80, 30000, 30012, 30014, 30016, 30040, 30656],
                 "ip": self._cluster_info['worker_ip']
             }
             self.__create_internal_lb(lb_settings, instance_groups['workers'])
