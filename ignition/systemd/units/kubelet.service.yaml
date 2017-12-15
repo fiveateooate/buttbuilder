@@ -11,8 +11,9 @@
       --volume dns,kind=host,source=/etc/resolv.conf \
       --mount volume=dns,target=/etc/resolv.conf \
       --volume etc-hosts,kind=host,source=/etc/hosts \
-      --mount volume=etc-hosts,target=/etc/hosts"
-
+      --mount volume=etc-hosts,target=/etc/hosts \
+      --volume iscsiadm,kind=host,source=/usr/sbin/iscsiadm \
+      --mount volume=iscsiadm,target=/usr/sbin/iscsiadm"
 
     ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
     ExecStartPre=/usr/bin/mkdir -p /var/log/containers

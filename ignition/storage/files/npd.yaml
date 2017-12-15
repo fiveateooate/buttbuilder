@@ -3,6 +3,31 @@
   mode: 0644
   contents:
     inline: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: node-problem-detector
+        namespace: kube-system
+        labels:
+          kubernetes.io/cluster-service: "true"
+          addonmanager.kubernetes.io/mode: Reconcile
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: npd-binding
+        labels:
+          kubernetes.io/cluster-service: "true"
+          addonmanager.kubernetes.io/mode: Reconcile
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:node-problem-detector
+      subjects:
+      - kind: ServiceAccount
+        name: node-problem-detector
+        namespace: kube-system
+      ---
       apiVersion: extensions/v1beta1
       kind: DaemonSet
       metadata:
@@ -56,20 +81,10 @@
             - name: localtime
               hostPath:
                 path: /etc/localtime
+                type: "FileOrCreate"
             serviceAccountName: node-problem-detector
             tolerations:
             - operator: "Exists"
               effect: "NoExecute"
             - key: "CriticalAddonsOnly"
               operator: "Exists"
-            - key: "node.alpha.kubernetes.io/ismaster"
-              effect: "NoSchedule"
-      ---
-      apiVersion: v1
-      kind: ServiceAccount
-      metadata:
-        name: node-problem-detector
-        namespace: kube-system
-        labels:
-          kubernetes.io/cluster-service: "true"
-          addonmanager.kubernetes.io/mode: Reconcile

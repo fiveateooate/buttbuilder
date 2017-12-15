@@ -1,0 +1,23 @@
+- name: multipathd.service
+  enable: true
+  contents: |
+    [Unit]
+    Description=Device-Mapper Multipath Device Controller
+    Before=iscsid.service
+    Before=local-fs-pre.target systemd-udev-trigger.service
+    After=multipathd.socket systemd-udevd.service
+    DefaultDependencies=no
+    Wants=local-fs-pre.target multipathd.socket
+    Conflicts=shutdown.target
+
+    [Service]
+    Type=notify
+    NotifyAccess=main
+    LimitCORE=infinity
+    ExecStartPre=/sbin/modprobe -a dm-multipath
+    ExecStart=/sbin/multipathd -d -s
+    ExecReload=/sbin/multipathd reconfigure
+
+    [Install]
+    WantedBy=sysinit.target
+    Also=multipathd.socket

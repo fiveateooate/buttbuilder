@@ -1,0 +1,8 @@
+- name: "iscsid-initiatorname.service"
+  enable: true
+  dropins:
+  - name: "50-initator-hostname.conf"
+    contents: |
+      [Service]
+      ExecStart=
+      ExecStart=/bin/sh -c 'echo InitiatorName=iqn.2016-04.com.coreos.iscsi:$(</etc/hostname) > /etc/iscsi/initiatorname.iscsi'

@@ -1,0 +1,2 @@
+- name: "iscsid.service"
+  enable: true
