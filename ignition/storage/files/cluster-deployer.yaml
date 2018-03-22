@@ -1,0 +1,42 @@
+- filesystem: "root"
+  path: "/etc/kubernetes/addons/cluster-deployer.yaml"
+  mode: 0644
+  contents:
+    inline: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: cluster-deployer
+        namespace: kube-system
+        labels:
+          app: cluster-deployer
+          kubernetes.io/cluster-service: "true"
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: cluster-deployer
+        template:
+          metadata:
+            labels:
+              app: cluster-deployer
+          spec:
+            imagePullSecrets:
+            - name: dockerhub
+            containers:
+            - name: thedefiler
+              image: weavelab/ops-thedefiler:v0.5.0
+              imagePullPolicy: Always
+              env:
+              - name: ETCD
+                value: "http://etcd3.ops:2379"
+              - name: CENV
+                valueFrom:
+                  configMapKeyRef:
+                    name: cluster-env
+                    key: cluster-env
+              - name: CID
+                valueFrom:
+                  configMapKeyRef:
+                    name: cluster-env
+                    key: cluster-id

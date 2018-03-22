@@ -1,0 +1,9 @@
+{
+  "test_butt_instance_config.py": true,
+  "test_buttips.py": true,
+  "test_gce.py": true,
+  "test_gce_instance_body.py": true,
+  "test_kube_masters.py": true,
+  "test_kube_workers.py": true,
+  "test_libvirt.py": true
+}
