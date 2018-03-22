@@ -3,7 +3,6 @@
 """
 
 import os
-import subprocess
 import buttlib
 
 
@@ -27,7 +26,7 @@ class ButtBuilder(object):
         __worker_ip_offset = env_info['workers']['ipOffset'] if 'workers' in env_info and 'ipOffset' in env_info['workers'] else 30
         __buttdir_base = args.buttdir if args.buttdir is not None else os.path.expanduser("~")
         __network_name = env_info['network']['networkName'] if 'network' in env_info and 'networkName' in env_info['network'] else __cluster_name + "-net"
-        __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.1.11'
+        __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.3.2'
 
         # create objects used by all builders
         # save env info -- used as dict for replacement in ignition files

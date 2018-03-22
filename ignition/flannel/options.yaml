@@ -1,3 +1,5 @@
 interface: {ip}
 etcd_endpoints: {etcd_hosts}
 ip_masq: true
+network_config: '{"Network": "172.16.0.0/12", "Backend": {"Type": "vxlan", "DirectRouting": true }}'
+version: "0.10.0"
