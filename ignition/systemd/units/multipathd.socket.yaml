@@ -1,4 +1,4 @@
-- name: multipathd.service
+- name: multipathd.socket
   enable: true
   contents: |
     # /lib/systemd/system/multipathd.socket

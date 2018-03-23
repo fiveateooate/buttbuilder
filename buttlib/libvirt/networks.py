@@ -90,8 +90,6 @@ def dhcp_add(client, dhcp_config):
         network = get(client, dhcp_config['network_name'])
         if network:
             dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
-            # call delete just in case
-            dhcp_delete_by_name(client, dhcp_config)
             network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_ADD_LAST, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml, __UPDATE_FLAGS)
             retval = True
     except libvirt.libvirtError as exc:
@@ -107,6 +105,7 @@ def dhcp_delete(client, dhcp_config):
             dhcp_xml = dhcp_entry_tmplt.format(**dhcp_config)
             network.update(libvirt.VIR_NETWORK_UPDATE_COMMAND_DELETE, libvirt.VIR_NETWORK_SECTION_IP_DHCP_HOST, -1, dhcp_xml, __UPDATE_FLAGS)
             retval = True
+            print("Deleted {}".format(dhcp_xml))
     except libvirt.libvirtError as exc:
         print(exc)
     return retval
@@ -120,7 +119,33 @@ def dhcp_delete_by_name(client, dhcp_config):
             network_xml = minidom.parseString(network.XMLDesc())
             dhcp_entries = network_xml.getElementsByTagName("host")
             for entry in dhcp_entries:
+                print(entry.attributes['name'].value)
                 if entry.attributes['name'].value == dhcp_config['hostname']:
+                    tmp_dhcp_config = {
+                        "hostname": entry.attributes['name'].value,
+                        "ip": entry.attributes['ip'].value,
+                        "mac": entry.attributes['mac'].value,
+                        "network_name": dhcp_config['network_name']
+                    }
+                    retval = dhcp_delete(client, tmp_dhcp_config)
+                    break
+    except libvirt.libvirtError as exc:
+        print(exc)
+    return retval
+
+
+def dhcp_delete_by_ip(client, dhcp_config):
+    retval = False
+    try:
+        print("IN DELETE BY IP")
+        network = get(client, dhcp_config['network_name'])
+        if network:
+            network_xml = minidom.parseString(network.XMLDesc())
+            dhcp_entries = network_xml.getElementsByTagName("host")
+            for entry in dhcp_entries:
+                print(entry.attributes['name'].value)
+                if entry.attributes['ip'].value == dhcp_config['ip']:
+                    print("FOUND {} - deleting".format(entry.attributes['ip'].value))
                     tmp_dhcp_config = {
                         "hostname": entry.attributes['name'].value,
                         "ip": entry.attributes['ip'].value,

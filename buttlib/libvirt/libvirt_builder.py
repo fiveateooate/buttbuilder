@@ -74,6 +74,8 @@ class Builder(buttlib.common.ButtBuilder):
             "mac": instance_config['mac'],
             "hostname": instance_config['hostname']
         }
+        # call delete in case ip exists
+        buttlib.libvirt.networks.dhcp_delete_by_ip(self.__client, __dhcp_config)
         buttlib.libvirt.networks.dhcp_add(self.__client, __dhcp_config)
         buttlib.libvirt.instances.create(self.__client, instance_config)
 
