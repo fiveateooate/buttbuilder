@@ -1,6 +1,0 @@
-flannel:
-  interface: 192.168.0.1
-  etcd_endpoints: 1.2.3.4
-  ip_masq: true
-  network_config: '{"Network": "172.16.0.0/12", "Backend": {"Type": "vxlan", "DirectRouting": true }}'
-  version: "0.9.1"

@@ -1,6 +1,7 @@
 """libvirt connection client"""
 
 import libvirt
+import buttlib
 
 
 class LibvirtClient():

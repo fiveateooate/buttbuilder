@@ -20,7 +20,7 @@ class ButtInstanceConfig(object):
     ___ALLOWED_ROLES__ = ['masters', 'workers']
 
     # the whole point of this is to create the ign
-    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, exclude_modules=[], provider_additional=None):
+    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, mac=None, exclude_modules=[], provider_additional=None):
         if role not in ButtInstanceConfig.___ALLOWED_ROLES__:
             raise buttlib.exceptions.UnknownRoleError(role)
         __exclude_modules = exclude_modules if exclude_modules else ButtInstanceConfig.__DEFAULT_EXCLUDE_MODULES__[role]
@@ -29,7 +29,7 @@ class ButtInstanceConfig(object):
         self.__instance_config = {
             "hostname": hostname,
             "buttdir": cluster_info['buttdir'],
-            "mac": buttlib.common.random_mac(),
+            "mac": mac if mac is not None else buttlib.common.random_mac(),
             "ip": ip,
             "disk": env_info[role]['disk'],
             "ram": env_info[role]['ram'],
