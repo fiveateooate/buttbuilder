@@ -21,7 +21,16 @@ xmldesc_tmplt = """<network>
 dhcp_entry_tmplt = "<host mac='{mac}' name='{hostname}' ip='{ip}'/>"
 
 
-def get(client, name):
+def get(client: libvirt.virConnect, name: str) -> libvirt.virNetwork:
+    """### Get a libvirt network by name.
+    #### Params
+        client: libvirt.virConnect
+            connection to libvirt
+        name: str
+            network name to retrive
+    #### Returns
+        libvirt.virNetwork object or None
+    """
     network = None
     try:
         network = client.connection.networkLookupByName(name)
@@ -30,7 +39,14 @@ def get(client, name):
     return network
 
 
-def list(client):
+def list(client: libvirt.virConnect) -> list:
+    """### Retrieve list of all networks.
+    #### Params
+        client: libvirt.virConnect
+            connection to libvirt
+    #### Returns
+        list of libvirt.virNetwork object or []
+    """
     try:
         networks = client.connection.listAllNetworks()
     except libvirt.libvirtError as exc:
@@ -39,7 +55,7 @@ def list(client):
     return networks
 
 
-def create(client, network_config):
+def create(client: libvirt.virConnect, network_config: dict):
     try:
         if 'bridgename' not in network_config:
             # max length of bridge name is 15 characters
@@ -78,13 +94,23 @@ def exists(client, name):
     return exists
 
 
-# info network.update call args
+# info on network.update arguments
 # 1. command - https://libvirt.org/html/libvirt-libvirt-network.html#virNetworkUpdateCommand
 # 2. section - https://libvirt.org/html/libvirt-libvirt-network.html#virNetworkUpdateSection
 # 3. parentIndex - -1 for don't care
 # 4. xml
- #5. flags -
-def dhcp_add(client, dhcp_config):
+# 5. flags
+def dhcp_add(client: libvirt.virConnect, dhcp_config) -> bool:
+    """
+    ### Add entry to a network's dhcp config
+    #### Params
+        client: libvirt.virConnect
+            connecttion to libvirt
+        dhcp_config: dict
+            ip, mac, ...
+    #### Returns
+        bool
+    """
     retval = False
     try:
         network = get(client, dhcp_config['network_name'])

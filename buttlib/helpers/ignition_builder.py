@@ -3,10 +3,10 @@ import glob
 import re
 import tempfile
 import yaml
-import time
+# import time
 from io import StringIO
-import copy
-import json
+# import copy
+# import json
 from sh import ct
 
 
@@ -53,8 +53,8 @@ class IgnitionBuilder:
         with tempfile.NamedTemporaryFile() as fp:
             fp.write((yaml.dump(self.__config, default_flow_style=False)).encode())
             fp.seek(0)
+            args = ["-in-file", fp.name]
             if pretty:
-                ct("-in-file", fp.name, "-strict", "-pretty", _out=buf)
-            else:
-                ct("-in-file", fp.name, "-strict", _out=buf)
+                args.append("-pretty")
+            ct(args, _out=buf)
         return buf.getvalue()

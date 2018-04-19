@@ -1,6 +1,7 @@
 """libvirt connection client"""
 
 import libvirt
+import buttlib
 
 
 class LibvirtClient():
@@ -11,6 +12,14 @@ class LibvirtClient():
 
     @property
     def connection(self):
+        """Short summary.
+
+        Returns
+        -------
+        libvirt.virConnect
+            connection to libvirt.
+
+        """
         return self.__connection
 
     @connection.setter

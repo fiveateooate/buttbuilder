@@ -1,8 +1,8 @@
 """ builder class for libvirt
 """
 import os
-import libvirt
-import yaml
+# import libvirt
+# import yaml
 import buttlib
 
 

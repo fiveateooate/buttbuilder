@@ -1,9 +1,0 @@
-- name: btrfs-root
-  mount:
-    device: /dev/disk/by-partlabel/ROOT
-    format: btrfs
-    create:
-      force: true
-      options:
-        - "-L"
-        - ROOT
