@@ -33,6 +33,12 @@ class Builder(buttlib.common.ButtBuilder):
         self.__storage_pool = None
         self.__network = None
 
+    def __get_mac_from_lease(self, ip):
+        retval = None
+        if ip in self.__leases:
+            retval = self.__leases[ip]['mac']
+        return retval
+
     def __pre_build(self):
         # probably do some checking exists stuff
         # gen admin and api certs
@@ -49,6 +55,7 @@ class Builder(buttlib.common.ButtBuilder):
             self.__network = buttlib.libvirt.networks.create(self.__client, self._cluster_info['network_config'])
         else:
             self.__network = buttlib.libvirt.networks.get(self.__client, self._cluster_info['network_config']['name'])
+        self.__leases = {lease['ipaddr']: lease for lease in self.__network.DHCPLeases()}
 
     def __create_volume(self, hostname, size):
         __vol_name = hostname + "." + self._cluster_info['image_type']
@@ -91,6 +98,7 @@ class Builder(buttlib.common.ButtBuilder):
                 self._ssl_helper,
                 self._env_info,
                 self._cluster_info,
+                mac=self.__get_mac_from_lease(ip),
                 provider_additional=provider_additional
             )
             # write out the config
@@ -104,6 +112,7 @@ class Builder(buttlib.common.ButtBuilder):
                 self._ssl_helper,
                 self._env_info,
                 self._cluster_info,
+                mac=self.__get_mac_from_lease(ip),
                 provider_additional=provider_additional
             )
             bic.write_ign()

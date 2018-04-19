@@ -5,6 +5,7 @@ from googleapiclient import errors
 
 import buttlib
 
+
 def create_instance_group(gce_conn, project, zone, name, network):
     try:
         group_config = {"name": name, "network": network}
