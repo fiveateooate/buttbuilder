@@ -29,7 +29,6 @@ xmldesc_tmplt = """<network>
 dhcp_entry_tmplt = "<host mac='{mac}' name='{hostname}' ip='{ip}'/>"
 
 
-<<<<<<< HEAD
 def get(client: libvirt.virConnect, name: str) -> libvirt.virNetwork:
     """Get virtual network by name
 

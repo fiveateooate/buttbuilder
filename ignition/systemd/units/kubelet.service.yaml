@@ -21,7 +21,6 @@
 
     ExecStart=/usr/lib/coreos/kubelet-wrapper {optionalHostnameOverride} \
       --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
-      --require-kubeconfig \
       {kubeletRegistration} \
       --cni-conf-dir=/etc/kubernetes/cni/net.d \
       --network-plugin=cni \
