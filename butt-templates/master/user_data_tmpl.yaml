@@ -4,12 +4,10 @@ ssh_authorized_keys:
 %(ssh_pub_keys)s
 hostname: "%(hostname)s"
 coreos:
+  update:
+    reboot-strategy: "off"
   units:
 %(network_config)s
-    - name: update-engine.service
-      command: stop
-    - name: locksmithd.service
-      command: stop
     - name: update-ca-certificates.service
       drop-ins:
         - name: 00-rmsymlink.conf
@@ -41,7 +39,7 @@ coreos:
           content: |
             [Service]
             ExecStartPre=/usr/bin/ln -sf /etc/flannel/options.env /run/flannel/options.env
-            ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "172.16.0.0/12" ,"Backend": { "Type": "vxlan" }}'
+            ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "%(cluster_cidr)s" ,"Backend": { "Type": "vxlan" }}'
     - name: docker.service
       drop-ins:
         - name: 50-flannel-config.conf
@@ -73,10 +71,10 @@ coreos:
         ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
 
         ExecStart=/usr/lib/coreos/kubelet-wrapper %(optional_hostname_override)s \
-          --api-servers=http://127.0.0.1:8080 \
-          --register-schedulable=false \
+          --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
+          --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule \
           --cni-conf-dir=/etc/kubernetes/cni/net.d \
-          --network-plugin=cni \
+          --network-plugin=%(network_plugin)s \
           --container-runtime=docker \
           --allow-privileged=true \
           --pod-manifest-path=/etc/kubernetes/manifests \
@@ -84,7 +82,8 @@ coreos:
           --cluster-domain=%(clusterDomain)s \
           --tls-cert-file=/etc/kubernetes/ssl/%(hostname)s.pem \
           --tls-private-key-file=/etc/kubernetes/ssl/%(hostname)s-key.pem \
-          --node-labels=cluster-role=master%(additional_labels)s
+          --node-labels=cluster-role=master%(additional_labels)s \
+          --cloud-provider=%(cloud_provider)s
 
         ExecStop=-/usr/bin/rkt stop --uuid-file=/var/run/kubelet-pod.uuid
         Restart=always
@@ -93,6 +92,28 @@ coreos:
         [Install]
         WantedBy=multi-user.target
 write_files:
+- path: /etc/kubernetes/kubeconfig.yaml
+  permissions: "0644"
+  owner: "root"
+  content: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - name: local
+      cluster:
+        server: https://%(master_ip)s:443
+        certificate-authority: /etc/kubernetes/ssl/ca.pem
+    users:
+    - name: kubelet
+      user:
+        client-certificate: /etc/kubernetes/ssl/%(hostname)s.pem
+        client-key: /etc/kubernetes/ssl/%(hostname)s-key.pem
+    contexts:
+    - context:
+        cluster: local
+        user: kubelet
+      name: kubelet-context
+    current-context: kubelet-context
 - path: /etc/flannel/options.env
   permissions: "0644"
   owner: "root"

@@ -4,12 +4,10 @@ ssh_authorized_keys:
 %(ssh_pub_keys)s
 hostname: "%(hostname)s"
 coreos:
+  update:
+    reboot-strategy: "off"
   units:
 %(network_config)s
-    - name: update-engine.service
-      command: stop
-    - name: locksmithd.service
-      command: stop
     - name: update-ca-certificates.service
       drop-ins:
         - name: 00-rmsymlink.conf
@@ -78,16 +76,15 @@ coreos:
         ExecStartPre=-/usr/bin/rkt rm --uuid-file=/var/run/kubelet-pod.uuid
 
         ExecStart=/usr/lib/coreos/kubelet-wrapper %(optional_hostname_override)s \
-          --api-servers=%(kube_masters)s \
           --cni-conf-dir=/etc/kubernetes/cni/net.d \
-          --network-plugin=cni \
+          --network-plugin=%(network_plugin)s \
           --container-runtime=docker \
+          --kubeconfig=/etc/kubernetes/kubeconfig.yaml \
           --register-node=true \
           --allow-privileged=true \
           --pod-manifest-path=/etc/kubernetes/manifests \
           --cluster-dns=%(dns_ip)s \
           --cluster-domain=%(clusterDomain)s \
-          --kubeconfig=/etc/kubernetes/worker-kubeconfig.yaml \
           --tls-cert-file=/etc/kubernetes/ssl/%(hostname)s.pem \
           --tls-private-key-file=/etc/kubernetes/ssl/%(hostname)s-key.pem \
           --node-labels=cluster-role=worker,worker-type=generic%(additional_labels)s \
@@ -129,7 +126,7 @@ write_files:
 - path: /etc/sysctl.d/max_map_count.conf
   content: |
     vm.max_map_count=262144
-- path: /etc/kubernetes/worker-kubeconfig.yaml
+- path: /etc/kubernetes/kubeconfig.yaml
   permissions: "0644"
   owner: "root"
   content: |
@@ -138,6 +135,7 @@ write_files:
     clusters:
     - name: local
       cluster:
+        server: https://%(master_ip)s:443
         certificate-authority: /etc/kubernetes/ssl/ca.pem
     users:
     - name: kubelet

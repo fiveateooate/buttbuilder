@@ -20,12 +20,12 @@ spec:
         env:
         - name: ETCDHOST
           value: "%(master_ip)s"
-        - name: CLUSTER_ENV
+        - name: CENV
           valueFrom:
             configMapKeyRef:
               name: cluster-env
               key: cluster-env
-        - name: CLUSTER_ID
+        - name: CID
           valueFrom:
             configMapKeyRef:
               name: cluster-env

@@ -11,7 +11,7 @@ import buttlib
 
 def main():
     pp = pprint.PrettyPrinter()
-    butt_ips = buttlib.common.ButtIps(network="10.128.0.0/20", subnet_offset=1)
+    butt_ips = buttlib.common.ButtIps(network="10.128.0.0/20", subnet_offset=15)
     pp.pprint(butt_ips.get_subnets())
     pp.pprint(butt_ips.get_ip(12))
     pp.pprint(butt_ips.get_random_ip())

@@ -53,59 +53,43 @@ def network(args, cluster_config_info, builder):
         builder.deleteNetwork()
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='make clusters in butts')
     # required args to identify cluster
     parser.add_argument(
-        '--cluster_env', '-e', help="environment name", required=True)
+        '--cenv', '-e', help="environment name", required=True)
     parser.add_argument(
-        '--cluster_id', '-i', help="cluster identifier", required=True)
+        '--cid', '-i', help="cluster identifier", required=True)
     # output modifiers
     parser.add_argument('--dryrun', '-d', help="dry run", action='store_true')
     parser.add_argument('--verbose', '-v', help="verbose", action='store_true')
-    parser.add_argument(
-        '--cluster_config_path',
-        help="path to cluster_config file if github is not working",
-        default=None)
+    parser.add_argument('--config', help="path to cluster config file if github is not working",  default=None)
+    parser.add_argument('--buttdir', help="path to store cluster files",  default=None)
     # operations
-    subparsers = parser.add_subparsers(
-        title="buttbuilder operations", help='do things with butts')
+    subparsers = parser.add_subparsers(title="buttbuilder operations", help='do things with butts')
     parser_build = subparsers.add_parser('build', help='Build a butt')
-    #parser_build.add_argument('--createcluster', help='build cluster',action="store_true")
+    # parser_build.add_argument('--createcluster', help='build cluster',action="store_true")
     parser_build.set_defaults(func=build)
 
     parser_node = subparsers.add_parser('node', help='Manage butt nodes')
-    parser_node.add_argument(
-        '--action', help='node actions', choices=["add", "remove"])
+    parser_node.add_argument('--action', help='node actions', choices=["add", "remove"])
     parser_node.add_argument('--name', help='node name to remove')
     parser_node.add_argument("--count", help="nodes to add", default=1, type=int)
     parser_node.set_defaults(func=node)
 
-    parser_firewall = subparsers.add_parser(
-        'firewall', help='Manage butt firewall')
-    parser_firewall.add_argument(
-        '--action',
-        help='firewall rule actions',
-        choices=["add", "remove"],
-        required=True)
+    parser_firewall = subparsers.add_parser('firewall', help='Manage butt firewall')
+    parser_firewall.add_argument('--action', help='firewall rule actions', choices=["add", "remove"], required=True)
     parser_firewall.add_argument('--proto', help='tcp,udp', required=True)
-    parser_firewall.add_argument(
-        '--ports', help='comma separated list of ports', required=True)
-    parser_firewall.add_argument(
-        '--sourcerange', help='rource range', default="0.0.0.0/0")
+    parser_firewall.add_argument('--ports', help='comma separated list of ports', required=True)
+    parser_firewall.add_argument('--sourcerange', help='rource range', default="0.0.0.0/0")
     parser_firewall.set_defaults(func=firewall)
 
-    parser_loadbalancer = subparsers.add_parser(
-        'loadbalancer', help='Manage butt loadbalancers')
-    parser_loadbalancer.add_argument(
-        '--action', help='loadbalancer actions', choices=["add", "remove"])
+    parser_loadbalancer = subparsers.add_parser('loadbalancer', help='Manage butt loadbalancers')
+    parser_loadbalancer.add_argument('--action', help='loadbalancer actions', choices=["add", "remove"])
     parser_loadbalancer.set_defaults(func=loadbalancer)
 
-    parser_network = subparsers.add_parser(
-        'network', help='Manage butt networks')
-    parser_network.add_argument(
-        '--action', help='network actions', choices=["add", "remove", "list"])
+    parser_network = subparsers.add_parser('network', help='Manage butt networks')
+    parser_network.add_argument('--action', help='network actions', choices=["add", "remove", "list"])
     parser_network.set_defaults(func=network)
 
     args = parser.parse_args()
@@ -116,7 +100,7 @@ if __name__ == '__main__':
 
     os.environ['provider'] = ""
     import buttlib.helpers
-    cluster_config_info = buttlib.helpers.ClusterConfigHandler(args.cluster_env, args.cluster_id, args.cluster_config_path)
+    cluster_config_info = buttlib.helpers.ClusterConfigHandler(args.cenv, args.cid, args.config)
 
     os.environ['provider'] = cluster_config_info.env_info['provider']
     import buttlib

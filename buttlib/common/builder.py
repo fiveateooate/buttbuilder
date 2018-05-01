@@ -11,7 +11,6 @@ import shutil
 import string
 import subprocess
 import hashlib
-
 from sh import kubectl  # pylint:disable=E0611
 
 import buttlib
@@ -26,8 +25,10 @@ class ButtBuilder(object):
         self._master_ip_offset = 10
         self._worker_ip_offset = 30
         __ssh_pub_key_helper = buttlib.helpers.SSHKeyHelper()
-        __subnet_mask = 24
+        __subnet_mask =  24
         __subnet_offset = 0
+        __cluster_name = "{}-{}".format(args.cenv, args.cid)
+        __buttdir_base = args.buttdir if args.buttdir is not None else os.path.expanduser("~")
         if 'network' in self._env_info:
             if 'subnetMask' in self._env_info['network']:
                 __subnet_mask = self._env_info['network']['subnetMask']
@@ -37,14 +38,16 @@ class ButtBuilder(object):
         self._cluster_internal_ips = buttlib.common.ButtIps(network=self._env_info['clusterNet'])
         # huge dict for convience in passing values to user_data
         self._cluster_info = {
-            "cluster_env": args.cluster_env,
-            "cluster_id": args.cluster_id,
+            "cenv": args.cenv,
+            "cid": args.cid,
             "cloud_provider": "",
+            "network_plugin": "cni",
+            "cluster_cidr": "172.16.0.0/12",
             "network_config": "",
-            "cluster_name": "{}-{}".format(self._args.cluster_env, self._args.cluster_id),
+            "cluster_name": "{}-{}".format(self._args.cenv, self._args.cid),
             "dns_ip": self._cluster_internal_ips.get_ip(5),
             "master_ip": self._butt_ips.get_ip(self._master_ip_offset),
-            "kube_master": self._butt_ips.get_ip(self._master_ip_offset), # wtf?
+            "kube_master": self._butt_ips.get_ip(self._master_ip_offset),  # wtf?
             "master_port": 443,
             "cluster_ip": self._cluster_internal_ips.get_ip(1),
             "ssh_pub_keys": __ssh_pub_key_helper.get_pub_keys(),
@@ -54,14 +57,14 @@ class ButtBuilder(object):
             "nameserver_config": "",
             "hostsfile": "",
             "resolvconf": "",
-            "dashboardFQDN": "dashboard-{}.weave.local".format(args.cluster_id),
+            "dashboardFQDN": "dashboard-{}.weave.local".format(args.cid),
             "base_image": "coreos_image.img",
             "coreos_image": "coreos_production_qemu_image.img.bz2",
             "ipOffsets": {
                 "masters": 10,
                 "workers": 30
             },
-            "etcd_version": "v3.2.5",
+            "etcd_version": "v3.3.4",
         }
         # these need cluster_name to be set first
         self._cluster_info["etcd_hosts"] = self.get_etcd_hosts()
@@ -69,7 +72,7 @@ class ButtBuilder(object):
         self._cluster_info["kube_masters"] = self.get_kube_masters()
         self._cluster_info["kube_addons"] = self.get_kube_addons()
         self._cluster_info["kube_manifests"] = self.get_kube_manifests()
-        self._cluster_info["buttdir"] = "%s/%s" % (os.path.expanduser("~"), self._cluster_info['cluster_name'])
+        self._cluster_info["buttdir"] = "{}/{}".format(__buttdir_base, __cluster_name)
         self._cluster_info["user_data_tmpl"] = {
             "master": self.__read_ud_template("master"),
             "worker": self.__read_ud_template("worker")
@@ -78,6 +81,7 @@ class ButtBuilder(object):
         if 'network' in self._env_info and 'networkName' in self._env_info['network']:
             self._cluster_info['network_name'] = self._env_info['network']['networkName']
 
+        print(self._cluster_info['buttdir'])
         if not os.path.exists(self._cluster_info['buttdir']):
             os.makedirs(self._cluster_info['buttdir'])
 
@@ -146,31 +150,31 @@ class ButtBuilder(object):
                     "{}/.kube/config.bak".format(os.path.expanduser("~")))
             kubectl(
                 "config", "set-cluster", "{}-{}-cluster".format(
-                    self._cluster_info['cluster_env'],
-                    self._cluster_info['cluster_id']),
+                    self._cluster_info['cenv'],
+                    self._cluster_info['cid']),
                 "--server=https://{}:{}".format(
                     self._cluster_info["kube_master"],
                     self._cluster_info["master_port"]),
                 "--certificate-authority={}/ssl/ca.pem".format(self._cluster_info['buttdir']))
             kubectl(
                 "config", "set-credentials", "{}-{}-admin".format(
-                    self._cluster_info['cluster_env'],
-                    self._cluster_info['cluster_id']),
+                    self._cluster_info['cenv'],
+                    self._cluster_info['cid']),
                 "--certificate-authority={}/ssl/ca.pem".format(self._cluster_info['buttdir']),
                 "--client-key={}/ssl/admin-key.pem".format(self._cluster_info['buttdir']),
                 "--client-certificate={}/ssl/admin.pem".format(self._cluster_info['buttdir']))
             kubectl("config", "set-context", "{}-{}-system".format(
-                self._cluster_info['cluster_env'],
-                self._cluster_info['cluster_id']),
+                self._cluster_info['cenv'],
+                self._cluster_info['cid']),
                     "--cluster={}-{}-cluster".format(
-                        self._cluster_info['cluster_env'],
-                        self._cluster_info['cluster_id']),
+                        self._cluster_info['cenv'],
+                        self._cluster_info['cid']),
                     "--user={}-{}-admin".format(
-                        self._cluster_info['cluster_env'],
-                        self._cluster_info['cluster_id']))
+                        self._cluster_info['cenv'],
+                        self._cluster_info['cid']))
             kubectl("config", "use-context", "{}-{}-system".format(
-                self._cluster_info['cluster_env'],
-                self._cluster_info['cluster_id']))
+                self._cluster_info['cenv'],
+                self._cluster_info['cid']))
 
     def fetch_image(self):
         """downloads the CoreOS image"""

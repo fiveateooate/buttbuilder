@@ -22,17 +22,17 @@ class ClusterConfigHandler(object):
     __github_url = "https://api.github.com"
     __cluster_config_repo = "ops-cluster_config"
     __github_get_file_tmpl = "/repos/%s/%s/contents/%s" # repo owner/repo name/file path
-    def __init__(self,cluster_env,cluster_id,cluster_config_path=None):
-        self.__cluster_config_yaml = "%s/%s.yaml"%(cluster_env,cluster_id)
+    def __init__(self,cenv,cid,cluster_config_path=None):
+        self.__cluster_config_yaml = "%s/%s.yaml"%(cenv,cid)
         if cluster_config_path:
             self.__cluster_config_path = cluster_config_path
-            self.env_info = (self.loadcluster_config())["%s:%s"%(cluster_env,cluster_id)]
+            self.env_info = (self.loadcluster_config())["%s:%s"%(cenv,cid)]
         else:
             if ('GITHUBUSER' not in os.environ) or ('GITHUBPASS' not in os.environ):
                 raise MissingEnvVarsError("GITHUBUSER and GITHUBPASS must be exported to env")
             self.__github_username = os.environ['GITHUBUSER']
             self.__github_password = os.environ['GITHUBPASS']
-            self.env_info = (self.fetchClusterInfo())["%s:%s"%(cluster_env,cluster_id)]
+            self.env_info = (self.fetchClusterInfo())["%s:%s"%(cenv,cid)]
 
     def fetchClusterInfo(self):
         retval = None

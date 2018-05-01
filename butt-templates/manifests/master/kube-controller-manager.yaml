@@ -16,6 +16,11 @@ spec:
     - --service-account-private-key-file=/etc/kubernetes/ssl/apiserver-key.pem
     - --root-ca-file=/etc/kubernetes/ssl/ca.pem
     - --cloud-provider=%(cloud_provider)s
+    - --allocate-node-cidrs=false
+    - --configure-cloud-routes=false
+    - --cluster-signing-cert-file=/etc/kubernetes/ssl/ca.pem
+    - --cluster-signing-key-file=/etc/kubernetes/ssl/ca-key.pem
+    - --cluster-cidr=%(cluster_cidr)s
     livenessProbe:
       httpGet:
         host: 127.0.0.1

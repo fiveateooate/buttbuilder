@@ -67,8 +67,7 @@ def create_firewall_rules(gce_conn, network, name, proto, ports, source_range,
         }
         operation = gce_conn.firewalls().insert(
             project=project, body=firewall_body).execute()
-        result = buttlib.gce.gce_common.wait_for_global_operation(gce_conn, project,
-                                                      operation['name'])
+        result = buttlib.gce.gce_common.wait_for_global_operation(gce_conn, project, operation['name'])
         return result['targetLink']
     except errors.HttpError as exc:
         if exc.resp.status == 409:
@@ -117,11 +116,9 @@ def create_http_health_check(gce_conn, project, name, port):
             print(exc)
 
 
-def create_internal_backend_service(gce_conn, project, region, name,
-                                    instance_groups, port):
+def create_internal_backend_service(gce_conn, project, region, name, instance_groups, port):
     try:
-        health_check = create_tcp_health_check(gce_conn, project,
-                                               "hc-%s" % name, port)
+        health_check = create_tcp_health_check(gce_conn, project, "hc-%s" % name, port)
         backends = [{"group": v['url']} for k, v in instance_groups.items()]
         backend_service_body = {
             "name": name,

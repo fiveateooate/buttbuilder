@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  cluster-env: %(cluster_env)s
-  cluster-id: %(cluster_id)s
+  cluster-env: %(cenv)s
+  cluster-id: %(cid)s
 kind: ConfigMap
 metadata:
   name: cluster-env

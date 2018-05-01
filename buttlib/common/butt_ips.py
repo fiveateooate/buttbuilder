@@ -3,8 +3,10 @@
 import ipaddress
 import random
 
+
 class ButtIps():
     """do stuff with ips for butts"""
+
     def __init__(self, network, subnet_mask=24, subnet_offset=0):
         self.__network = network
         self.__subnet_mask = subnet_mask
@@ -19,7 +21,7 @@ class ButtIps():
         __subnet = self.get_subnets()[self.__subnet_offset]
         return str(ipaddress.IPv4Network(__subnet)[index])
 
-    def  get_random_ip(self):
+    def get_random_ip(self):
         """:returns: string - random ip adderss within network"""
         __subnet = self.get_subnets()[self.__subnet_offset]
         num = random.randint(1, 254)
