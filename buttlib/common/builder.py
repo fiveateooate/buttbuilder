@@ -26,8 +26,8 @@ class ButtBuilder(object):
         __worker_ip_offset = env_info['workers']['ipOffset'] if 'workers' in env_info and 'ipOffset' in env_info['workers'] else 30
         __buttdir_base = args.buttdir if args.buttdir is not None else os.path.expanduser("~")
         __network_name = env_info['network']['networkName'] if 'network' in env_info and 'networkName' in env_info['network'] else __cluster_name + "-net"
-        __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.3.2'
-
+        __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.3.4'
+        __cluster_cidr = env_info['clusterCIDR'] if 'clusterCIDR' in env_info else '172.16.0.0/12'
         # create objects used by all builders
         # save env info -- used as dict for replacement in ignition files
         self._env_info = env_info
@@ -58,6 +58,7 @@ class ButtBuilder(object):
             "cluster_env": args.cenv,
             "cluster_id": args.cid,
             "cluster_name": __cluster_name,
+            "cluster_cidr": __cluster_cidr,
             "dns_ip": self._cluster_internal_ips.get_ip(5),
             "master_ip": self._butt_ips.get_ip(__master_ip_offset),  # set master to first master - used to set a lb master if applicable
             "kube_master": self._butt_ips.get_ip(__master_ip_offset),  # wtf? why is this twice

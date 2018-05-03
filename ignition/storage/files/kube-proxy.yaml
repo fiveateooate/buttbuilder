@@ -8,6 +8,11 @@
       metadata:
         name: kube-proxy
         namespace: kube-system
+        annotations:
+            prometheus.io.scrape: "true"
+            prometheus.io.path: "/metrics"
+            prometheus.io.port: "10249"
+            scheduler.alpha.kubernetes.io/critical-pod: ""
       spec:
         hostNetwork: true
         containers:
@@ -16,8 +21,8 @@
           command:
           - /hyperkube
           - proxy
-          - --master={kubeAPIServer}
-          - --kubeconfig=/etc/kubernetes/kubeconfig.yaml
+          - -v=0
+          - --config=/etc/kubernetes/config/kube-proxy.conf
           securityContext:
             privileged: true
           volumeMounts:
@@ -26,8 +31,17 @@
             - mountPath: /etc/kubernetes/kubeconfig.yaml
               name: "kubeconfig"
               readOnly: true
+            - mountPath: /etc/kubernetes/config/kube-proxy.conf
+              name: "proxyconfig"
+              readOnly: true
             - mountPath: /etc/kubernetes/ssl
               name: "etc-kubernetes-ssl"
+              readOnly: true
+            - mountPath: /lib/modules
+              name: "modules"
+              readOnly: true
+            - mountPath: /usr/sbin/ipvsadm
+              name: "ipvsadm"
               readOnly: true
         volumes:
           - name: "ssl-certs"
@@ -36,6 +50,15 @@
           - name: "kubeconfig"
             hostPath:
               path: "/etc/kubernetes/kubeconfig.yaml"
+          - name: "proxyconfig"
+            hostPath:
+              path: "/etc/kubernetes/config/kube-proxy.conf"
           - name: "etc-kubernetes-ssl"
             hostPath:
               path: "/etc/kubernetes/ssl"
+          - name: "modules"
+            hostPath:
+              path: "/lib/modules"
+          - name: "ipvsadm"
+            hostPath:
+              path: "/usr/sbin/ipvsadm"

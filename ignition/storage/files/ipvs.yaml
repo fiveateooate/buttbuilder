@@ -1,0 +1,6 @@
+- filesystem: "root"
+  path: "/etc/modules-load.d/ip_vs.conf"
+  mode: 0644
+  contents:
+    inline: |
+      ip_vs
