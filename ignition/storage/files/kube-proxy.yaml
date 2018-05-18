@@ -21,7 +21,6 @@
           command:
           - /hyperkube
           - proxy
-          - -v=0
           - --config=/etc/kubernetes/config/kube-proxy.conf
           securityContext:
             privileged: true
@@ -40,9 +39,6 @@
             - mountPath: /lib/modules
               name: "modules"
               readOnly: true
-            - mountPath: /usr/sbin/ipvsadm
-              name: "ipvsadm"
-              readOnly: true
         volumes:
           - name: "ssl-certs"
             hostPath:
@@ -59,6 +55,3 @@
           - name: "modules"
             hostPath:
               path: "/lib/modules"
-          - name: "ipvsadm"
-            hostPath:
-              path: "/usr/sbin/ipvsadm"
