@@ -1,10 +1,6 @@
-# Build a kubernetes cluster - you know you want to
+# Build CoreOS Kubernetes clusters
 
-Uses yaml configuration file to create and configure a kubernetes cluster. Available providers are libvirt, virtualbox, aws, and gce. Uses cloud-init/user-data to configure cluster on boot.
-
-
-* switching to ignition is  work in progreess, see the ignitionswitch branch
-* readme somewhat out of date
+Uses yaml configuration file to create and configure a kubernetes cluster. Available providers are libvirt, virtualbox, aws, and gce. Uses [ignition](https://coreos.com/ignition/docs/latest/) to configure cluster on boot.
 
 ## Setup
 ### osx Dependencies
@@ -14,9 +10,8 @@ $ pip3 install pyyaml ipaddress requests
 $ easy_install-3.6 PyOpenSSL PyCrypto
 ```
 ### Linux Dependencies
-So awesome and easy no additional comment is needed
-### m$ garbage whatever
-you should be ashamed
+Similar to osx use pip and distro package manager
+
 ### kubectl
 Most likely you want kubectl
 
@@ -31,24 +26,27 @@ Arch Linux from AUR - `packer -S google-cloud-sdk`
 Example:
 
 ```yaml
-clusterenv:clusterid:
+cluster_env:cluster_id:
   clusterDomain: cluster.local
-  kubeletVersion: v1.8.2_coreos.0
-  externalNet: "192.168.69.0/24"
-  clusterNet: "192.168.70.0/24"
-  coreosChannel: alpha
-  libvirtHost: "qemu:///system"
+  clusterNet: 192.168.3.0/24
+  clusterCIDR: 172.16.0.0/12
+  coreosChannel: stable
+  etcdVersion: 3.3.5
+  externalNet: 192.168.68.0/23
+  kubeletVersion: v1.10.3_coreos.0
+  libvirtURI: qemu:///system
   masters:
-    nodes: 1
-    ram: 1024
     cpus: 1
-    disk: 9
+    disk: 10
+    nodes: 1
+    ram: 2048
+  provider: libvirt
   workers:
-    nodes: 2
-    ram: 3192
-    cpus: 2
-    disk: 26
-provider: libvirt
+    cpus: 4
+    disk: 20
+    nodes: 3
+    ram: 8192
+
 ...
 ```
 Notes:
@@ -68,7 +66,7 @@ Notes:
 ## Usage:
 
 ```bash
-./buttbuilder.py --cluster_env cluster_environment --cluster_id clusterid --cluster_config_path path/to/yaml build
+./buttbuilder.py --cenv cluster_env --cid cluster_id --config /path/to/cluster-config.yaml --buttdir /home/clusters/ build
 ```
 
 ### addons
