@@ -19,13 +19,14 @@ def build(args, cluster_config_info, builder):
         print(exception)
 
 
-def node(args, cluster_config_info, builder):
-    if args.action == 'add':
-        for i in range(0, args.count):
-            print("adding a node")
-            builder.add_node()
-    if args.action == 'remove' and args.name is not None:
-        builder.remove_node(args.name)
+def add(args, cluster_config_info, builder):
+    for i in range(0, args.count):
+        print("adding a node")
+        builder.add_node(args.offset + i, args.configonly)
+
+
+def remove(args, cluster_config_info, builder):
+    builder.remove_node(args.name)
 
 
 def firewall(args, cluster_config_info, builder):
@@ -76,11 +77,11 @@ if __name__ == '__main__':
     parser_build .add_argument('--force', help="Delete and recreate cluster", action="store_true")
     parser_build.set_defaults(func=build)
 
-    parser_node = subparsers.add_parser('node', help='Manage butt nodes')
-    parser_node.add_argument('--action', help='node actions', choices=["add", "remove"])
-    parser_node.add_argument('--name', help='node name to remove')
-    parser_node.add_argument("--count", help="nodes to add", default=1, type=int)
-    parser_node.set_defaults(func=node)
+    parser_add_node = subparsers.add_parser('add', help='Manage butt nodes')
+    parser_add_node.add_argument("--count", help="nodes to add", default=1, type=int)
+    parser_add_node.add_argument("--offset", help="offset for node numbering", type=int, required=True)
+    parser_add_node.add_argument('--configonly', help='generate config only', action='store_true')
+    parser_add_node.set_defaults(func=add)
 
     parser_firewall = subparsers.add_parser('firewall', help='Manage butt firewall')
     parser_firewall.add_argument('--action', help='firewall rule actions', choices=["add", "remove"], required=True)
@@ -96,6 +97,7 @@ if __name__ == '__main__':
     parser_network = subparsers.add_parser('network', help='Manage butt networks')
     parser_network.add_argument('--action', help='network actions', choices=["add", "remove", "list"])
     parser_network.set_defaults(func=network)
+
     parser_verify = subparsers.add_parser('verify', help='Verify butt state')
     parser_verify.set_defaults(func=verify)
     args = parser.parse_args()

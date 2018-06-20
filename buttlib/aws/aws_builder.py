@@ -28,8 +28,8 @@ class Builder(buttlib.common.ButtBuilder):
             'ec2', region_name=self._env_info['Region'])
         self.__buttnet = "%s-net" % (self._cluster_info['cluster_name'])
         self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "%s/ssl" % self._cluster_info['buttdir'])
-        #self._master_ip_offset = 30
-        #self._worker_ip_offset = 50
+        # self._master_ip_offset = 30
+        # self._worker_ip_offset = 50
         self._cluster_info['network_name'] = "net-%s" % self._cluster_info[
             'cluster_name']
         self._cluster_info['ip'] = "$private_ipv4"
@@ -37,7 +37,7 @@ class Builder(buttlib.common.ButtBuilder):
             ipaddress.IPv4Network(self._env_info['externalNet'])[2])
         self._cluster_info['kube_masters'] = self.get_kube_masters()
         self.__ip_offset = {'masters': 10, "workers": 30}
-        self._cluster_info['master_ip'] = "10.250.250.10" #"lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
+        self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
         self._cluster_info['cloud_provider'] = "aws"
 
     def __get_ami(self):
@@ -63,36 +63,16 @@ class Builder(buttlib.common.ButtBuilder):
         self.__ssl_helper.generateHost(vm_info['hostname'], vm_info['ip'])
         user_data = ""
         ud_dict = {
-            "kube_addons":
-            yaml.dump(self._cluster_info['kube_addons']) % {
-                **
-                vm_info,
-                **
-                self._env_info,
-                **
-                self._cluster_info
-            },
-            "kube_manifests":
-            yaml.dump(self._cluster_info['kube_manifests'][node_type]) % {
-                **
-                vm_info,
-                **
-                self._env_info,
-                **
-                self._cluster_info
-            },
-            "host_pem":
-            self.__ssl_helper.getInfo()["%s_pem" % vm_info['hostname']],
-            "host_key":
-            self.__ssl_helper.getInfo()["%s_key" % vm_info['hostname']]
+            "kube_addons": yaml.dump(self._cluster_info['kube_addons']) % {**vm_info, **self._env_info, **self._cluster_info},
+            "kube_manifests": yaml.dump(self._cluster_info['kube_manifests'][node_type]) % {**vm_info, **self._env_info, **self._cluster_info},
+            "host_pem": self.__ssl_helper.getInfo()["%s_pem" % vm_info['hostname']],
+            "host_key": self.__ssl_helper.getInfo()["%s_key" % vm_info['hostname']]
         }
         if node_type == 'master':
-            user_data = self._cluster_info['user_data_tmpl']['master'] % (
-                {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
+            user_data = self._cluster_info['user_data_tmpl']['master'] % ({**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
         else:
-            user_data = self._cluster_info['user_data_tmpl']['worker'] % (
-                {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
-        #return gzip.compress(user_data.encode('utf-8'))
+            user_data = self._cluster_info['user_data_tmpl']['worker'] % ({**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
+        # return gzip.compress(user_data.encode('utf-8'))
         return user_data
 
     def __get_availability_zones(self):
@@ -118,17 +98,13 @@ class Builder(buttlib.common.ButtBuilder):
         return "ip-{formatted_ip}".format(formatted_ip=re.sub(r"\.", "-", ip_address))
 
     def __make_hostname(self, index, role):
-        return "kube-{role}-{cluster_id}-{suffix:02d}".format(
-            cluster_id=self._cluster_info['cluster_id'], suffix=index + 1, role=role)
+        return "kube-{role}-{cluster_id}-{suffix:02d}".format(cluster_id=self._cluster_info['cluster_id'], suffix=index + 1, role=role)
 
     def __make_worker_hostname(self):
-        return "kube-worker-{cluster_name}-{suffix}".format(
-            cluster_name=self._cluster_info['cluster_name'],
-            suffix=self.get_hostname_suffix())
+        return "kube-worker-{cluster_name}-{suffix}".format(cluster_name=self._cluster_info['cluster_name'], suffix=self.get_hostname_suffix())
 
     def __make_master_hostname(self, index):
-        return "kube-master-{cluster_name}-{suffix:02d}".format(
-            cluster_name=self._cluster_info['cluster_name'], suffix=index + 1)
+        return "kube-master-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index + 1)
 
     def __write_user_data(self, vm_info):
         ud_filename = "{buttdir}/{hostname}.user_data.yaml".format(buttdir=self._cluster_info['buttdir'], hostname=vm_info['hostname'])

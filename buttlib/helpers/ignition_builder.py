@@ -23,7 +23,7 @@ class IgnitionBuilder:
                 config[tail] = self.__build_config(dir_item, basepath, {}, replacements_dict)
                 if config[tail] == {}:
                     del(config[tail])
-            elif re.search("\.yaml$", dir_item):
+            elif re.search(r"\.yaml$", dir_item):
                 # print("processing {}".format(dir_item))
                 # skip ignored modules - used for master/worker diffs
                 if tail.replace(".yaml", "") in self.__exclude_modules:
@@ -47,7 +47,7 @@ class IgnitionBuilder:
     def ign(self, config):
         self.__config = config
 
-    def get_ignition(self, pretty=False):
+    def get_ignition(self, pretty=True):
         # yamlfile = "/tmp/bb-config-{}.yaml".format(int(time.time()))
         buf = StringIO()
         with tempfile.NamedTemporaryFile() as fp:

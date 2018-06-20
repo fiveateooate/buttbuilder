@@ -99,6 +99,5 @@ class ButtBuilder(object):
         # create instances
         pass
 
-    def check_cluster(self):
-        # verify cluster state ????
+    def add_node(self, configonly):
         pass

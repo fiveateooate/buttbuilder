@@ -129,11 +129,26 @@ class Builder(buttlib.common.ButtBuilder):
         print("Checking vm's ...")
         self.verify_vms()
 
-    # def add_node(self):
-    #     """add a node to existing kubernetes cluster"""
-    #     __vm_config = self.generate_worker_config()
-    #     self.add_dhcp_entry(__vm_config)
-    #     self.create_vm(__vm_config, 'worker')
+    def add_node(self, offset, configonly=False):
+        """add a node to existing kubernetes cluster"""
+        self.__pre_build()
+        (hostname, ip) = self._kube_workers.generate_worker(offset-1)
+        provider_additional = {"image_type": self._cluster_info['image_type']}
+        bic = buttlib.common.ButtInstanceConfig(
+            hostname,
+            ip,
+            'workers',
+            self._ssl_helper,
+            self._env_info,
+            self._cluster_info,
+            mac=self.__get_mac_from_lease(ip),
+            provider_additional=provider_additional
+        )
+        bic.write_ign()
+        if not configonly:
+            self.__create_vm(bic.instance_config)
+            # self.add_dhcp_entry(__vm_config)
+            # self.create_vm(__vm_config, 'worker')
     #
     # @staticmethod
     # def delete_vm(vm_name):

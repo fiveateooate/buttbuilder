@@ -14,7 +14,7 @@ class KubeWorkers(object):
         self.__ip_offset = ip_offset
         self.__hostname_format = hostname_format_override if hostname_format_override else "kube-worker-{cluster_name}-{suffix}"
         while len(self.__workers) < self.__count:
-            self.__workers.append(self.generate_worker())
+            self.__workers.append(self.generate_worker(len(self.__workers)))
 
     # call provider fetch existing function? this is screwy
     def fetch_existing_workers(self, provider):
@@ -22,8 +22,8 @@ class KubeWorkers(object):
         # buttlib.provider.builder.fetch_workers()
         return []
 
-    def generate_worker(self):
-        ip = self.__butt_ips.get_ip(self.__ip_offset + len(self.__workers))
+    def generate_worker(self, offset):
+        ip = self.__butt_ips.get_ip(self.__ip_offset + offset)
         hostname = self.__hostname_format.format(cluster_name=self.__cluster_name, suffix=buttlib.common.random_hostname_suffix())
         return (hostname, ip)
 

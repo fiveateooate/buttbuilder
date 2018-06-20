@@ -1,6 +1,6 @@
 noenv:buttbuildertest:
   clusterDomain: cluster.local
-  kubeletVersion: v1.8.3_coreos.0
+  kubeletVersion: v1.10.3_coreos.0
   externalNet: "10.254.0.0/24"
   clusterNet: "192.168.66.0/24"
   coreosChannel: stable
