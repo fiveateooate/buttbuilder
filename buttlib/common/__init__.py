@@ -1,12 +1,15 @@
 """import all the things"""
 
+__all__ = ["ButtBuilder", "ClusterExistsError", "IncompleteEnvironmentSetup", "DoNotDestroyCluster", "MissingEnvVarsError", "MissingCredentialsError", "TemplateNotFoundError"]
+
 from buttlib.common.builder import ButtBuilder
 from buttlib.common.exceptions import (
     ClusterExistsError,
     DoNotDestroyCluster,
     IncompleteEnvironmentSetup,
     MissingEnvVarsError,
-    TemplateNotFoundError
+    TemplateNotFoundError,
+    MissingCredentialsError
 )
 from buttlib.common.butt_ips import ButtIps
 from buttlib.common.kube_masters import KubeMasters

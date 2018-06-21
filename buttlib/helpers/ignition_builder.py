@@ -47,13 +47,13 @@ class IgnitionBuilder:
     def ign(self, config):
         self.__config = config
 
-    def get_ignition(self, pretty=True):
+    def get_ignition(self, platform, pretty=False):
         # yamlfile = "/tmp/bb-config-{}.yaml".format(int(time.time()))
         buf = StringIO()
         with tempfile.NamedTemporaryFile() as fp:
             fp.write((yaml.dump(self.__config, default_flow_style=False)).encode())
             fp.seek(0)
-            args = ["-in-file", fp.name]
+            args = ["-in-file", fp.name, "-platform", platform]
             if pretty:
                 args.append("-pretty")
             ct(args, _out=buf)

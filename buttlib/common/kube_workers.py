@@ -13,6 +13,7 @@ class KubeWorkers(object):
         self.__butt_ips = butt_ips
         self.__ip_offset = ip_offset
         self.__hostname_format = hostname_format_override if hostname_format_override else "kube-worker-{cluster_name}-{suffix}"
+        self.__random_hostname = True if provider is 'libvirt' else False
         while len(self.__workers) < self.__count:
             self.__workers.append(self.generate_worker(len(self.__workers)))
 
@@ -24,7 +25,8 @@ class KubeWorkers(object):
 
     def generate_worker(self, offset):
         ip = self.__butt_ips.get_ip(self.__ip_offset + offset)
-        hostname = self.__hostname_format.format(cluster_name=self.__cluster_name, suffix=buttlib.common.random_hostname_suffix())
+        suffix = buttlib.common.random_hostname_suffix() if self.__random_hostname else "{:02d}".format(offset+1)
+        hostname = self.__hostname_format.format(cluster_name=self.__cluster_name, suffix=suffix)
         return (hostname, ip)
 
     @property

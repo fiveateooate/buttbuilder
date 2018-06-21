@@ -34,6 +34,7 @@ class DoNotDestroyCluster(KeyError):
     def __str__(self):
         return repr(self.value)
 
+
 class TemplateNotFoundError(Exception):
     """ Exception for error finding proxmox template """
 
@@ -44,11 +45,21 @@ class TemplateNotFoundError(Exception):
     def __str__(self):
         return repr(self.value)
 
+
 class ClusterExistsError(Exception):
     """ Exception for when building cluster
     instances to be created are found
     """
 
+    def __init__(self, value):
+        Exception.__init__(self)
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+class MissingCredentialsError(Exception):
     def __init__(self, value):
         Exception.__init__(self)
         self.value = value

@@ -1,7 +1,7 @@
 """hold config and whatevers for instance"""
 
 import buttlib
-import pprint
+import hashlib
 
 
 class ButtInstanceConfig(object):
@@ -20,7 +20,7 @@ class ButtInstanceConfig(object):
     ___ALLOWED_ROLES__ = ['masters', 'workers']
 
     # the whole point of this is to create the ign
-    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, mac=None, exclude_modules=[], provider_additional=None):
+    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, mac=None, platform="custom", exclude_modules=[], provider_additional=None):
         if role not in ButtInstanceConfig.___ALLOWED_ROLES__:
             raise buttlib.exceptions.UnknownRoleError(role)
         __exclude_modules = exclude_modules if exclude_modules else ButtInstanceConfig.__DEFAULT_EXCLUDE_MODULES__[role]
@@ -32,8 +32,8 @@ class ButtInstanceConfig(object):
             "mac": mac if mac is not None else buttlib.common.random_mac(),
             "ip": ip,
             "disk": env_info[role]['disk'],
-            "ram": env_info[role]['ram'],
-            "cpus": env_info[role]['cpus'],
+            "ram": env_info[role]['ram'] if 'ram' in env_info[role] else None,
+            "cpus": env_info[role]['cpus'] if 'cpus' in env_info[role] else None,
             "additionalLabels": "",
             "exclude_modules": __exclude_modules,
             "host_pem": ssl_helper.getInfo()["{}_pem".format(hostname)],
@@ -43,7 +43,8 @@ class ButtInstanceConfig(object):
             "ca_pem": ssl_helper.getInfo()["ca_pem"],
             "ca_key": ssl_helper.getInfo()["ca_key"],
             "ign": "",
-            "network_name": cluster_info['network_name']
+            "network_name": cluster_info['network_name'],
+            "filename": "{}/{}.ign".format(self.__buttdir, hostname)
         }
         # set role specific stuff, if bad role given fail constructor
         if role == 'masters':
@@ -68,7 +69,8 @@ class ButtInstanceConfig(object):
         self.__instance_config['ign'] = buttlib.helpers.IgnitionBuilder(
             replacements_dict=__replacements_dict,
             exclude_modules=__exclude_modules
-        ).get_ignition()
+        ).get_ignition(platform=platform)
+        self.__ign_sha512 = hashlib.sha512(self.__instance_config['ign'].encode('utf-8')).hexdigest()
 
     @property
     def instance_config(self):
@@ -82,15 +84,17 @@ class ButtInstanceConfig(object):
     def ign(self):
         return self.__instance_config['ign']
 
+    @property
+    def ign_sha512(self):
+        return self.__ign_sha512
+
     def write_ign(self):
-        filename = "{}/{}.ign".format(self.__buttdir, self.__instance_config['hostname'])
-        with open(filename, "w+b") as fp:
+        with open(self.__instance_config['filename'], "w+b") as fp:
             fp.write(self.__instance_config['ign'].encode())
 
     # these don't belong here
     # comment to remind me
     def make_awsy(self):
-        # do soemthing with ign to make it work in aws
         pass
 
     def make_gcey(self):

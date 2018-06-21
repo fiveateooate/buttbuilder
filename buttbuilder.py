@@ -17,6 +17,8 @@ def build(args, cluster_config_info, builder):
         print(exception)
     except buttlib.common.DoNotDestroyCluster as exception:
         print(exception)
+    except buttlib.common.MissingCredentialsError as exception:
+        print(exception)
 
 
 def add(args, cluster_config_info, builder):
@@ -70,6 +72,7 @@ if __name__ == '__main__':
     # base config
     parser.add_argument('--config', '-c', help="path to cluster_config/yaml file if github is not working", default=None)
     parser.add_argument('--buttdir', '-D', help="directory to store cluster data")
+    parser.add_argument('--awsprofile', help="aws auth profile")
     parser.add_argument('--image_format', '-F', help="image format", default='qcow2')
     # operations
     subparsers = parser.add_subparsers(title="buttbuilder operations", help='do things with butts')
