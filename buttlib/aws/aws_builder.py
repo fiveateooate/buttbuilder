@@ -5,6 +5,7 @@ import re
 
 import boto3
 import yaml
+import json
 
 import buttlib
 
@@ -39,6 +40,8 @@ class Builder(buttlib.common.ButtBuilder):
         # self.__ip_offset = {'masters': 10, "workers": 30}
         # self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
         self._cluster_info['cloud_provider'] = "aws"
+        self.__s3_url = "s3.amazonaws.com"
+        self.__s3_schema = "https"
 
     def __get_ami(self):
         response = self.__aws_client.describe_images(
@@ -184,8 +187,8 @@ class Builder(buttlib.common.ButtBuilder):
                 }
             ],
             "IamInstanceProfile": {
-                'Arn': self._env_info['IAMARN'],
-                'Name': self._env_info['IAMName']
+                'Arn': self._env_info['IAMARN']
+                # 'Name': self._env_info['IAMName']
             }
         }
         return temp
@@ -195,14 +198,23 @@ class Builder(buttlib.common.ButtBuilder):
             "ignition": {
                 "version": "2.2.0",
                 "config": {
-                    "source": "http://{}/{}/{}.ign".format("s3.amazonaws.com", self.__bucket_name, bic.instance_config['hostname']),
                     "replace": {
-                        "verification": {"hash": "{}".format(bic.ign_sha512)}
+                        "source": "{}://{}/{}/{}.ign".format(self.__s3_schema, self.__s3_url, self.__bucket_name, bic.instance_config['hostname']),
+                        "verification": {
+                            "hash": "sha512-{}".format(bic.ign_sha512)
+                            }
                         }
                     }
                 }
             }
-        return replace_ign
+        return json.dumps(replace_ign)
+
+    def upload_ign(self, filepath, hostname):
+        filename = "{}.ign".format(hostname)
+        extra_args = {
+            'ACL': 'public-read'
+        }
+        self.__s3_client.upload_file(filepath, self.__bucket_name, filename, ExtraArgs=extra_args)
 
     def __create_vm(self, bic):
         replace_ign = self.__ign_replace_config(bic)
@@ -219,20 +231,20 @@ class Builder(buttlib.common.ButtBuilder):
         cmd += "IamInstanceProfile={}".format(bic.instance_config['IamInstanceProfile'])
         cmd += ")"
         print(cmd)
-        # instance = self.__aws_resource.create_instances(
-        #     DryRun=self._args.dryrun,
-        #     MinCount=1,
-        #     MaxCount=1,
-        #     ImageId=self.__ami,
-        #     UserData=bic.ign_gz,
-        #     InstanceType=bic.instance_config['InstanceType'],
-        #     Placement=bic.instance_config['Placement'],
-        #     NetworkInterfaces=bic.instance_config['NetworkInterfaces'],
-        #     BlockDeviceMappings=bic.instance_config['BlockDeviceMappings'],
-        #     TagSpecifications=bic.instance_config['TagSpecifications'],
-        #     IamInstanceProfile=bic.instance_config['IamInstanceProfile']
-        # )
-        # return instance
+        instance = self.__aws_resource.create_instances(
+            DryRun=self._args.dryrun,
+            MinCount=1,
+            MaxCount=1,
+            ImageId=self.__ami,
+            UserData=replace_ign,
+            InstanceType=bic.instance_config['InstanceType'],
+            Placement=bic.instance_config['Placement'],
+            NetworkInterfaces=bic.instance_config['NetworkInterfaces'],
+            BlockDeviceMappings=bic.instance_config['BlockDeviceMappings'],
+            TagSpecifications=bic.instance_config['TagSpecifications'],
+            IamInstanceProfile=bic.instance_config['IamInstanceProfile']
+        )
+        return instance
 
     def build(self):
         """build a k8s butt in aws"""
@@ -254,8 +266,7 @@ class Builder(buttlib.common.ButtBuilder):
             )
             # write out the config
             bic.write_ign()
-            print(bic.ign_sha512)
-            self.__s3_client.upload_file(bic.instance_config['filename'], self.__bucket_name, "{}.ign".format(hostname))
+            self.upload_ign(bic.instance_config['filename'], hostname)
             instances.append(self.__create_vm(bic))
             index += 1
         index = 0
@@ -272,7 +283,7 @@ class Builder(buttlib.common.ButtBuilder):
                 provider_additional=provider_additional
             )
             bic.write_ign()
-            self.__s3_client.upload_file(bic.instance_config['filename'], self.__bucket_name, "{}.ign".format(hostname))
+            self.upload_ign(bic.instance_config['filename'], hostname)
             instances.append(self.__create_vm(bic))
             index += 1
         for instance in instances:
