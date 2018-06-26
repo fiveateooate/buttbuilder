@@ -122,7 +122,8 @@ class SSLHelper():
         san_list = "IP.1:{}".format(hostip)
         host_cert = OpenSSL.crypto.X509()
         host_key = self.generateKey()
-        self.setCertDefaults(host_cert, hostname)
+        self.setCertDefaults(host_cert, "system:node:{}".format(hostname))
+        host_cert.get_subject().O = "system:nodes"
         host_cert.add_extensions([
             OpenSSL.crypto.X509Extension(b'basicConstraints', False, b'CA:FALSE')
         ])
@@ -138,7 +139,8 @@ class SSLHelper():
         san_list = "DNS.1:{}".format(hostname)
         host_cert = OpenSSL.crypto.X509()
         host_key = self.generateKey()
-        self.setCertDefaults(host_cert, hostname)
+        self.setCertDefaults(host_cert, "system:node:{}".format(hostname))
+        host_cert.get_subject().O = "system:nodes"
         host_cert.add_extensions([
             OpenSSL.crypto.X509Extension(b'basicConstraints', False,
                                          b'CA:FALSE')
@@ -155,7 +157,8 @@ class SSLHelper():
     def generateAdmin(self):
         admin_cert = OpenSSL.crypto.X509()
         admin_key = self.generateKey()
-        self.setCertDefaults(admin_cert, "kube-admin")
+        self.setCertDefaults(admin_cert, "cluster-admin")
+        admin_cert.get_subject().O = "system:masters"
         admin_cert.add_extensions([
             OpenSSL.crypto.X509Extension(b'basicConstraints', False, b'CA:FALSE')
         ])

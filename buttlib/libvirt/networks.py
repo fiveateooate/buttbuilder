@@ -65,6 +65,7 @@ def list(client: libvirt.virConnect) -> list:
         networks = []
     return networks
 
+
 def create(client: libvirt.virConnect, network_config: dict) ->libvirt.virNetwork:
     """Create and set a network to autostart
 
@@ -87,7 +88,7 @@ def create(client: libvirt.virConnect, network_config: dict) ->libvirt.virNetwor
         network.create()
         if 'autostart' in network_config and network_config['autostart']:
             network.setAutostart(1)
-    except libvirt.libvirtError as exc:
+    except libvirt.libvirtError:
         network = None
     return network
 

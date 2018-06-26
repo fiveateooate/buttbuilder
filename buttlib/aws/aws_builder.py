@@ -28,7 +28,7 @@ class Builder(buttlib.common.ButtBuilder):
         self.__aws_client = self.__aws_session.client('ec2', region_name=self._env_info['Region'])
         self.__aws_resource = self.__aws_session.resource('ec2', region_name=self._env_info['Region'])
         self.__s3_client = self.__aws_session.client("s3", region_name=self._env_info['Region'])
-        self.__bucket_name = "clusterbuilder"
+        self.__bucket_name = self._env_info['ignBucket']
         # self.__buttnet = "{}-net".format(self._cluster_info['cluster_name'])
         # self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']))
         # self._master_ip_offset = 30
@@ -36,6 +36,7 @@ class Builder(buttlib.common.ButtBuilder):
         # self._cluster_info['network_name'] = "net-{}".format(self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
         # self._cluster_info['master_ip'] = str(ipaddress.IPv4Network(self._env_info['externalNet'])[2])
+        self._cluster_info[]'kube_master_lb_ip'] = self._butt_ips.get_ip(self._env_info['masterLBIPOffset'])
         # self._cluster_info['kube_masters'] = self.get_kube_masters()
         # self.__ip_offset = {'masters': 10, "workers": 30}
         # self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])

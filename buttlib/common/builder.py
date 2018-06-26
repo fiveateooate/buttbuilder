@@ -21,9 +21,9 @@ class ButtBuilder(object):
         # used in a couple places in __init__
         __cluster_name = "{}-{}".format(args.cenv, args.cid)
         # offset begining master ips default is 10 to allow for dns, k8s cluster ip, ...
-        __master_ip_offset = env_info['ipOffset'] + 10 if 'ipOffset' in env_info else 10
+        __master_ip_offset = env_info['masters']['ipOffset'] if 'ipOffset' in env_info['masters'] else 10
         # offset for beginning worker ips, leave some room for masters
-        __worker_ip_offset = env_info['ipOffset'] + 30 if 'ipOffset' in env_info else 30
+        __worker_ip_offset = env_info['workers']['ipOffset'] if 'ipOffset' in env_info['workers'] else 30
         __buttdir_base = args.buttdir if args.buttdir is not None else os.path.expanduser("~")
         __network_name = env_info['network']['networkName'] if 'network' in env_info and 'networkName' in env_info['network'] else __cluster_name + "-net"
         __etcd_version = env_info['etcdVersion'] if 'etcdVersion' in env_info else '3.3.8'
