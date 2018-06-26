@@ -36,7 +36,7 @@ class Builder(buttlib.common.ButtBuilder):
         # self._cluster_info['network_name'] = "net-{}".format(self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
         # self._cluster_info['master_ip'] = str(ipaddress.IPv4Network(self._env_info['externalNet'])[2])
-        self._cluster_info[]'kube_master_lb_ip'] = self._butt_ips.get_ip(self._env_info['masterLBIPOffset'])
+        self._cluster_info['kube_master_lb_ip'] = self._butt_ips.get_ip(self._env_info['masterLBIPOffset'])
         # self._cluster_info['kube_masters'] = self.get_kube_masters()
         # self.__ip_offset = {'masters': 10, "workers": 30}
         # self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
