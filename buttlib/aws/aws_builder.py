@@ -2,7 +2,7 @@
 
 # import ipaddress
 import re
-
+import sys
 import boto3
 import yaml
 import json
@@ -36,11 +36,11 @@ class Builder(buttlib.common.ButtBuilder):
         # self._cluster_info['network_name'] = "net-{}".format(self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
         # self._cluster_info['master_ip'] = str(ipaddress.IPv4Network(self._env_info['externalNet'])[2])
-        self._cluster_info['kube_master_lb_ip'] = self._butt_ips.get_ip(self._env_info['masterLBIPOffset'])
+        self._cluster_info['kube_master_lb_ip'] = self._env_info['masterLBName']
         # self._cluster_info['kube_masters'] = self.get_kube_masters()
         # self.__ip_offset = {'masters': 10, "workers": 30}
         # self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
-        self._cluster_info['cloud_provider'] = "aws"
+        self._cluster_info['buttProvider'] = "aws"
         self.__s3_url = "s3.amazonaws.com"
         self.__s3_schema = "https"
 
@@ -84,7 +84,9 @@ class Builder(buttlib.common.ButtBuilder):
         return yaml.load(Builder.__DISK_MAPPINGS_TEMPLATE.format(**self._env_info[host_type], **{"hostname": hostname}))
 
     def __pre_build(self):
-        self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], self._kube_masters.hostnames)
+        masters = self._kube_masters.hostnames
+        masters.append(self._cluster_info['kube_master_lb_ip'])
+        self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], masters)
         self.__availability_zones = self.__get_availability_zones()
         self.__ami = self.__get_ami()
     # def get_kube_masters(self):
@@ -183,7 +185,8 @@ class Builder(buttlib.common.ButtBuilder):
                 {
                     'ResourceType': 'instance', 'Tags': [
                         {"Key": "Name", "Value": hostname},
-                        {"Key": "cluster-role", "Value": re.sub(r"s$", "", role)}
+                        {"Key": "cluster-role", "Value": re.sub(r"s$", "", role)},
+                        {"Key": "kubernetes.io/cluster/{}".format(self._cluster_info['cluster_id']), "Value": "owned"}
                     ]
                 }
             ],
