@@ -29,19 +29,10 @@ class Builder(buttlib.common.ButtBuilder):
         self.__aws_resource = self.__aws_session.resource('ec2', region_name=self._env_info['Region'])
         self.__s3_client = self.__aws_session.client("s3", region_name=self._env_info['Region'])
         self.__bucket_name = self._env_info['ignBucket']
-        # self.__buttnet = "{}-net".format(self._cluster_info['cluster_name'])
-        # self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']))
-        # self._master_ip_offset = 30
-        # self._worker_ip_offset = 50
-        # self._cluster_info['network_name'] = "net-{}".format(self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
-        # self._cluster_info['master_ip'] = str(ipaddress.IPv4Network(self._env_info['externalNet'])[2])
         self._cluster_info['kube_master_lb_ip'] = self._env_info['masterLBName']
-        # self._cluster_info['kube_masters'] = self.get_kube_masters()
-        # self.__ip_offset = {'masters': 10, "workers": 30}
-        # self._cluster_info['master_ip'] = "10.250.250.10" # "lb-kube-masters-{}".format(self._cluster_info['cluster_id'])
         self._cluster_info['buttProvider'] = "aws"
-        self.__s3_url = "s3.amazonaws.com"
+        self.__s3_url = self._env_info['s3URL']
         self.__s3_schema = "https"
 
     def __get_ami(self):
@@ -89,85 +80,6 @@ class Builder(buttlib.common.ButtBuilder):
         self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], masters)
         self.__availability_zones = self.__get_availability_zones()
         self.__ami = self.__get_ami()
-    # def get_kube_masters(self):
-    #     """:returns: list - k8s api endpoints"""
-    #     ips = self.get_master_ips()
-    #     return ','.join(
-    #         ["https://%s" % (master) for master in self.get_aws_master_hosts(ips)])
-
-    # def __get_network_interface(self):  # maybe don't need
-    #     pass
-    #
-    # @staticmethod
-    # def __make_aws_hostname(ip_address):
-    #     return "ip-{formatted_ip}".format(formatted_ip=re.sub(r"\.", "-", ip_address))
-    #
-    # def __make_hostname(self, index, role):
-    #     return "kube-{role}-{cluster_id}-{suffix:02d}".format(cluster_id=self._cluster_info['cluster_id'], suffix=index + 1, role=role)
-    #
-    # def __make_worker_hostname(self):
-    #     return "kube-worker-{cluster_name}-{suffix}".format(cluster_name=self._cluster_info['cluster_name'], suffix=self.get_hostname_suffix())
-    #
-    # def __make_master_hostname(self, index):
-    #     return "kube-master-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index + 1)
-    #
-    # def __write_user_data(self, vm_info):
-    #     ud_filename = "{buttdir}/{hostname}.user_data.yaml".format(buttdir=self._cluster_info['buttdir'], hostname=vm_info['hostname'])
-    #     with open(ud_filename, "w") as file:
-    #         file.write(vm_info['UserData'])
-    #
-    # def get_master_hosts(self):
-    #     return [
-    #         "kube-master-{cluster_id}-{suffix:02d}".format(
-    #             cluster_id=self._cluster_info['cluster_id'], suffix=i + 1)
-    #         for i in range(self._env_info['masters']['nodes'])
-    #     ]
-    #
-    # def get_aws_master_hosts(self, ips):
-    #     return [
-    #         "ip-{}".format(re.sub(r"\.", "-", ip))
-    #         for ip in ips
-    #     ]
-    #
-    # def get_etcd_hosts(self):
-    #     return ",".join(["http://{}:2379".format(ip) for ip in self.get_master_ips()])
-    #
-    # def get_initial_cluster(self):
-    #     ips = self.get_master_ips()
-    #     # hosts = self.get_master_hosts()
-    #     hosts = self.get_aws_master_hosts(ips)
-    #     return ",".join(["{}=http://{}:2380".format(hosts[i], ips[i]) for i in range(len(hosts))])
-
-    # def get_master_ips(self):
-    #     return [str(ipaddress.IPv4Network(self._env_info['externalNet'])[i + 10]) for i in range(self._env_info['masters']['nodes'])]
-    #
-    # def get_vm_config(self, index, zone, role):
-    #     """gather up vm specific crap
-    #     :returns: dict - info for one vm
-    #     """
-    #     vm_info = {}
-    #     # vm_info['hostname'] = self.__make_hostname(index, re.sub("s$", "", role))
-    #     vm_info['ip'] = str(
-    #         ipaddress.IPv4Network(self._env_info['externalNet'])[
-    #             index + self.__ip_offset[role]])
-    #     vm_info['hostname'] = self.__make_aws_hostname(vm_info['ip'])
-    #     vm_info['Placement'] = {"AvailabilityZone": zone}
-    #     vm_info['InstanceType'] = self._env_info[role]['InstanceType']
-    #     vm_info['BlockDeviceMappings'] = [self.__get_disk_map(
-    #         role, vm_info['hostname'])]
-    #     vm_info[
-    #         'additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={},failure-domain.beta.kubernetes.io/zone={}".format(
-    #             self._env_info['Region'], zone)
-    #     vm_info['TagSpecifications'] = [{'ResourceType': 'instance', 'Tags':[{"Key": "Name", "Value": vm_info['hostname']}, {"Key": "cluster-role", "Value": re.sub(r"s$", "", role)}]}]
-    #     vm_info['NetworkInterfaces'] = [{
-    #         "SubnetId": self._env_info['SubnetId'],
-    #         "PrivateIpAddress": vm_info['ip'],
-    #         "DeviceIndex": 0,
-    #         "Groups": self._env_info[role]['SecurityGroupIds']
-    #     }]
-    #     vm_info['UserData'] = self.get_user_data(
-    #         re.sub(r"s$", "", role), vm_info)
-    #     return vm_info
 
     def __provider_additional(self, index, ip, hostname, role):
         zone = self._env_info['Zone'] if 'Zone' in self._env_info else self.__availability_zones[index % len(self.__availability_zones)]['ZoneName']

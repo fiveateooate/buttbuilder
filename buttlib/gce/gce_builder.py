@@ -74,7 +74,7 @@ class Builder(buttlib.common.ButtBuilder):
         self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
         # setting butt provider to gce doesn't work out of the box need to figure out a buncha crap
         # enabling it make it do things like try to create load balancers and stuff and breaks scheduling
-        self._cluster_info['cloud_provider'] = "gce"
+        self._cluster_info['buttProvider'] = "gce"
 
         # stupid fecking shit cause we have all this stupid fecking vpn crap
         if "network" in self._env_info:
