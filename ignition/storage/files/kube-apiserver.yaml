@@ -23,13 +23,14 @@
           - --secure-port=443
           - --advertise-address={ip}
           - --apiserver-count={masters[nodes]}
-          - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota
+          - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota,NodeRestriction
           - --tls-cert-file=/etc/kubernetes/ssl/apiserver.pem
           - --tls-private-key-file=/etc/kubernetes/ssl/apiserver-key.pem
           - --client-ca-file=/etc/kubernetes/ssl/ca.pem
           - --service-account-key-file=/etc/kubernetes/ssl/apiserver-key.pem
           - --runtime-config=extensions/v1beta1/networkpolicies=true
           - --anonymous-auth=false
+          - --authorization-mode=Node,RBAC
           - --cloud-provider={buttProvider}
           livenessProbe:
             httpGet:

@@ -80,7 +80,7 @@ class ButtBuilder(object):
             },
             "kube_master_lb_ip": "",  # these can/should be set in subclass mostly here to keep things from puking
             "optionalHostnameOverride": "",
-            "additionalLabels": "",
+            "additionalLabels": "beta.kubernetes.io/kube-proxy-ds-ready=true",
             "nameserver_config": "",
             "hostsfile": "",
             "resolvconf": "",
