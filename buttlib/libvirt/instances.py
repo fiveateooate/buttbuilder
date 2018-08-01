@@ -18,6 +18,9 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
     <timer name='pit' tickpolicy='delay'/>
     <timer name='hpet' present='no'/>
   </clock>
+    <cpu mode='host-model' check='partial'>
+    <model fallback='allow'/>
+  </cpu>
   <features>
     <acpi/>
     <apic/>
@@ -30,7 +33,7 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='{buttdir}/{hostname}.{image_type}'/>
-      <target dev='hda' bus='virtio'/>
+      <target dev='vda' bus='virtio'/>
     </disk>
     <interface type='network'>
       <mac address='{mac}'/>
@@ -52,6 +55,9 @@ dom_xml_tmplt = """<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/dom
       <listen type='address'/>
       <image compression='off'/>
     </graphics>
+    <video>
+      <model type='virtio' heads='1' primary='yes'/>
+    </video>
   </devices>
    <qemu:commandline>
      <qemu:arg value='-fw_cfg'/>
