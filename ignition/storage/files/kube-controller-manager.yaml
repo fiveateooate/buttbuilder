@@ -12,7 +12,7 @@
         hostNetwork: true
         containers:
         - name: kube-controller-manager
-          image: quay.io/coreos/hyperkube:{kubeletVersion}
+          image: {kubeletURL}:{kubeletVersion}
           command:
           - /hyperkube
           - controller-manager

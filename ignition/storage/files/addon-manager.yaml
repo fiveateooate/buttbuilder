@@ -14,7 +14,7 @@
         hostNetwork: true
         containers:
         - name: kube-addon-manager
-          image: gcr.io/google-containers/kube-addon-manager:v8.5
+          image: gcr.io/google-containers/kube-addon-manager:v8.6
           command:
           - /bin/bash
           - -c

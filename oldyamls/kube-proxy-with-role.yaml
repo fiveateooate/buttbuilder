@@ -3,6 +3,29 @@
   mode: 0644
   contents:
     inline: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: kube-proxy
+        namespace: kube-system
+        labels:
+          addonmanager.kubernetes.io/mode: Reconcile
+      ---
+      kind: ClusterRoleBinding
+      apiVersion: rbac.authorization.k8s.io/v1beta1
+      metadata:
+        name: system:kube-proxy
+        labels:
+          addonmanager.kubernetes.io/mode: Reconcile
+      subjects:
+        - kind: ServiceAccount
+          name: kube-proxy
+          namespace: kube-system
+      roleRef:
+        kind: ClusterRole
+        name: system:kube-proxier
+        apiGroup: rbac.authorization.k8s.io
+      ---
       apiVersion: extensions/v1beta1
       kind: DaemonSet
       metadata:
@@ -40,7 +63,7 @@
               effect: "NoSchedule"
             containers:
             - name: kube-proxy
-              image: {kubeletURL}:{kubeletVersion}
+              image: quay.io/coreos/hyperkube:{kubeletVersion}
               command:
               - /hyperkube
               - proxy
@@ -61,10 +84,10 @@
                 readOnly: true
               - mountPath: /lib/modules
                 name: "modules"
-                readOnly: true
+                  readOnly: true
               - mountPath: /run/xtables.lock
                 name: xtables-lock
-                readOnly: false
+                  readOnly: false
             volumes:
             - name: "ssl-certs"
               hostPath:

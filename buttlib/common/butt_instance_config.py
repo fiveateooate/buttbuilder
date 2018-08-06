@@ -34,7 +34,7 @@ class ButtInstanceConfig(object):
             "disk": env_info[role]['disk'],
             "ram": env_info[role]['ram'] if 'ram' in env_info[role] else None,
             "cpus": env_info[role]['cpus'] if 'cpus' in env_info[role] else None,
-            "additionalLabels": "",
+            "additionalLabels": ','.join(cluster_info['additionalLabels']),
             "exclude_modules": __exclude_modules,
             "host_pem": ssl_helper.getInfo()["{}_pem".format(hostname)],
             "host_key": ssl_helper.getInfo()["{}_key".format(hostname)],
