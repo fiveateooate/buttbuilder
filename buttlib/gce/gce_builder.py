@@ -303,6 +303,23 @@ class Builder(buttlib.common.ButtBuilder):
         print("create a butt")
         self.__pre_build()
         cprint(self.__image, "yellow")
+        for hostname, ip in self._kube_masters.masters:
+            provider_additional = []
+            bic = buttlib.common.ButtInstanceConfig(
+                hostname,
+                ip,
+                'masters',
+                self._ssl_helper,
+                self._env_info,
+                self._cluster_info,
+                platform="gce",
+                provider_additional=provider_additional
+            )
+            print(bic)
+            # write out the config
+            # bic.write_ign()
+            # self.upload_ign(bic.instance_config['filename'], hostname)
+            # index += 1
         # instances = []
         # operations = []
         # image = buttlib.gce.images.getFromFamily(self.client)
