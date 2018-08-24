@@ -5,7 +5,7 @@ https://cloud.google.com/compute/docs/reference/latest/globalOperations
 import time
 
 
-def wait(client, operation):
+def global_wait(client, operation):
     """ input: gce client and operation
         output: request result - json
         sleep/waits for global operation to complete

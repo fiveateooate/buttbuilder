@@ -59,7 +59,7 @@ class Builder(buttlib.common.ButtBuilder):
     def __init__(self, env_info, args):
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
 
-        self.client = buttlib.gce.client(project=self._env_info['project'], region=self._env_info['region'])
+        self.client = buttlib.gce.GCEClient(project=self._env_info['project'], region=self._env_info['region'])
         # self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']), bits=2048)
         self._cluster_info['master_lb_name'] = self._env_info['masterLBName']
         # self._cluster_info['worker_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="worker", cluster_name=self._cluster_info['cluster_name'])
@@ -84,7 +84,7 @@ class Builder(buttlib.common.ButtBuilder):
         masters = self._kube_masters.hostnames
         masters.append(self._cluster_info['kube_master_lb_ip'])
         self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], masters)
-        self.__image = buttlib.gce.images.getFromFamily(self.client)
+        self.__image = buttlib.gce.GCEImages.getFromFamily(self.client)
 
     # def __get_hostname(self, role, index):
     #     hostname = "kube-worker-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index+1)
@@ -302,7 +302,7 @@ class Builder(buttlib.common.ButtBuilder):
         """create the butt"""
         print("create a butt")
         self.__pre_build()
-        print(self.__image)
+        cprint(self.__image, "yellow")
         # instances = []
         # operations = []
         # image = buttlib.gce.images.getFromFamily(self.client)
@@ -339,57 +339,57 @@ class Builder(buttlib.common.ButtBuilder):
         # self.__add_to_target_pool(instances)
         # self.__add_firewall_rules()
 
-    def get_user_data(self, role, vm_info):
-        """:params node_type: master or worker
-        :params vm_info: dict of vm config
-        :params __ssl_helper: ssl helper class instance to do stuff with certs
-        :returns: string - big glob of user data"""
-        user_data = ""
-        self.__ssl_helper.generateHostName(vm_info['hostname'])
-        ud_dict = {
-            "kube_addons":
-            yaml.dump(self._cluster_info['kube_addons']) % {
-                **
-                vm_info,
-                **
-                self._env_info,
-                **
-                self._cluster_info
-            },
-            "kube_manifests":
-            yaml.dump(self._cluster_info['kube_manifests'][re.sub(
-                r"s$", "", role)]) % {
-                    **
-                    vm_info,
-                    **
-                    self._env_info,
-                    **
-                    self._cluster_info
-                },
-            "host_pem":
-            self.__ssl_helper.getInfo()["%s_pem" % vm_info['hostname']],
-            "host_key":
-            self.__ssl_helper.getInfo()["%s_key" % vm_info['hostname']]
-        }
-        if "network" in self._env_info:
-            self._cluster_info['resolvconf'] = self._cluster_info['resolvconf'] % (self._env_info['network'])
-            self._cluster_info['hostsfile'] = self._cluster_info['hostsfile_tmpl'] % (vm_info)
-        if role == 'masters':
-            user_data = self._cluster_info['user_data_tmpl']['master'] % (
-                {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
-        else:
-            user_data = self._cluster_info['user_data_tmpl']['worker'] % (
-                {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
-        return user_data
-
-    def get_kube_masters(self):
-        """:returns: string"""
-        return "https://{ip}".format(ip=self._cluster_info['master_ip'])
-
-    def create_forwarding_rule(self, portrange="443", proto="TCP"):
-        """create a gce forwarding rule"""
-        name = "%s-fwd" % self._cluster_info['cluster_name']
-        buttlib.gce.gce_network.create_forwarding_rule(
-            self.__gce_conn, name, proto, portrange,
-            self._cluster_info['master_lb_name'], self._env_info['region'],
-            self._env_info['project'])
+    # def get_user_data(self, role, vm_info):
+    #     """:params node_type: master or worker
+    #     :params vm_info: dict of vm config
+    #     :params __ssl_helper: ssl helper class instance to do stuff with certs
+    #     :returns: string - big glob of user data"""
+    #     user_data = ""
+    #     self.__ssl_helper.generateHostName(vm_info['hostname'])
+    #     ud_dict = {
+    #         "kube_addons":
+    #         yaml.dump(self._cluster_info['kube_addons']) % {
+    #             **
+    #             vm_info,
+    #             **
+    #             self._env_info,
+    #             **
+    #             self._cluster_info
+    #         },
+    #         "kube_manifests":
+    #         yaml.dump(self._cluster_info['kube_manifests'][re.sub(
+    #             r"s$", "", role)]) % {
+    #                 **
+    #                 vm_info,
+    #                 **
+    #                 self._env_info,
+    #                 **
+    #                 self._cluster_info
+    #             },
+    #         "host_pem":
+    #         self.__ssl_helper.getInfo()["%s_pem" % vm_info['hostname']],
+    #         "host_key":
+    #         self.__ssl_helper.getInfo()["%s_key" % vm_info['hostname']]
+    #     }
+    #     if "network" in self._env_info:
+    #         self._cluster_info['resolvconf'] = self._cluster_info['resolvconf'] % (self._env_info['network'])
+    #         self._cluster_info['hostsfile'] = self._cluster_info['hostsfile_tmpl'] % (vm_info)
+    #     if role == 'masters':
+    #         user_data = self._cluster_info['user_data_tmpl']['master'] % (
+    #             {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
+    #     else:
+    #         user_data = self._cluster_info['user_data_tmpl']['worker'] % (
+    #             {**vm_info, **self._cluster_info, **self._env_info, **(self.__ssl_helper.getInfo()), **ud_dict})
+    #     return user_data
+    #
+    # def get_kube_masters(self):
+    #     """:returns: string"""
+    #     return "https://{ip}".format(ip=self._cluster_info['master_ip'])
+    #
+    # def create_forwarding_rule(self, portrange="443", proto="TCP"):
+    #     """create a gce forwarding rule"""
+    #     name = "%s-fwd" % self._cluster_info['cluster_name']
+    #     buttlib.gce.gce_network.create_forwarding_rule(
+    #         self.__gce_conn, name, proto, portrange,
+    #         self._cluster_info['master_lb_name'], self._env_info['region'],
+    #         self._env_info['project'])

@@ -6,7 +6,7 @@ https://cloud.google.com/compute/docs/reference/latest/zoneOperations
 import time
 
 
-def wait(client, operation):
+def zone_wait(client, operation):
     """ input: connection, zone, and operation
         output: request result - json
         sleep/waits for zone operation to complete

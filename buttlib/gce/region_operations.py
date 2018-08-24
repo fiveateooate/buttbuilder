@@ -5,7 +5,7 @@ https://cloud.google.com/compute/docs/reference/latest/regionOperations
 import time
 
 
-def wait(client, operation):
+def region_wait(client, operation):
     """ input: gce connection and operation
         output: request result - json
         sleep/waits for region operation to complete
