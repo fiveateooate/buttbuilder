@@ -12,7 +12,7 @@ class SSHKeyHelper():
     def read_public_keys(self):
         """ read pub keys of type rsa, dsa, or ed25519 for use in user_data"""
         ssh_pub_keys = []
-        pattern = re.compile(r'^.*_(ras|dsa|ed25519).*.pub$')
+        pattern = re.compile(r'^.*_(rsa|dsa|ed25519).*.pub$')
         for key in [key for key in os.listdir(self.__ssh_key_dir) if re.search(pattern, key)]:
             with open("%s/%s"%(self.__ssh_key_dir, key), 'r') as file:
                 ssh_pub_keys.append(file.read())

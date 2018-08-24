@@ -1,13 +1,11 @@
 """ build a gce butt"""
-import copy
-import os
+# import os
 import re
-
+from termcolor import cprint
 import yaml
+import buttlib
 # from googleapiclient import discovery
 # from oauth2client.client import GoogleCredentials
-
-import buttlib
 
 _CONFIG_TMPL = {
     'name':
@@ -63,15 +61,15 @@ class Builder(buttlib.common.ButtBuilder):
 
         self.client = buttlib.gce.client(project=self._env_info['project'], region=self._env_info['region'])
         self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']), bits=2048)
-        self._cluster_info['master_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="master", cluster_name=self._cluster_info['cluster_name'])
-        self._cluster_info['worker_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="worker", cluster_name=self._cluster_info['cluster_name'])
+        self._cluster_info['master_lb_name'] = self._env_info['masterLBName']
+        # self._cluster_info['worker_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="worker", cluster_name=self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
         self.__network_url = None
-        self._cluster_info['master_ip'] = self._butt_ips.get_ip(2)
-        self._cluster_info['worker_ip'] = self._butt_ips.get_ip(3)
-        self._cluster_info['kube_masters'] = self.get_kube_masters()
-        self._cluster_info['ipOffsets'] = {"masters": 30, "workers": 50}
-        self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
+        # self._cluster_info['master_ip'] = self._butt_ips.get_ip(2)
+        # self._cluster_info['worker_ip'] = self._butt_ips.get_ip(3)
+        # self._cluster_info['kube_masters'] = self.get_kube_masters()
+        # self._cluster_info['ipOffsets'] = {"masters": 30, "workers": 50}
+        # self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
         # setting butt provider to gce doesn't work out of the box need to figure out a buncha crap
         # enabling it make it do things like try to create load balancers and stuff and breaks scheduling
         self._cluster_info['buttProvider'] = "gce"
@@ -124,15 +122,15 @@ class Builder(buttlib.common.ButtBuilder):
         return [self._butt_ips.get_ip(i + self._cluster_info['ipOffsets']['masters']) for i in range(self._env_info['masters']['nodes'])]
 
     def __create_certs(self):
-        buttlib.helpers.BColors().bcprint("Creating certs ...", "HEADER")
+        cprint("Creating certs ...", "magenta")
         master_ips = self.get_master_ips()
         master_ips.append(self._cluster_info['master_ip'])
         self.__ssl_helper.createCerts(master_ips, self._cluster_info["cluster_ip"], self.get_master_hosts())
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
 
     def __create_or_get_network(self):
         network_url = ""
-        buttlib.helpers.BColors().bcprint("Creating network ...", "HEADER")
+        cprint("Creating network ...", "magenta")
         network = buttlib.gce.networks.get(self.client, self._cluster_info['network_name'])
         if network:
             network_url = network['selfLink']
@@ -141,14 +139,14 @@ class Builder(buttlib.common.ButtBuilder):
                 print("would have created network {}".format(self._cluster_info['network_name']))
             else:
                 network_url = buttlib.gce.networks.create(self.client, self._cluster_info['network_name'], self._env_info['externalNet'])
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
         return network_url
 
     def __create_or_get_instance_groups(self):
         """create a gce instance group"""
         instance_groups = {'masters': {}, 'workers': {}}
         region_info = buttlib.gec.regions.get(self.client)
-        buttlib.helpers.BColors().bcprint("Creating instance groups ...", "HEADER")
+        cprint("Creating instance groups ...", "magenta")
         # if not self._args.dryrun:
         for zone in region_info['zones']:
             zone_name = (zone.split("/")[-1]).strip()
@@ -159,7 +157,7 @@ class Builder(buttlib.common.ButtBuilder):
             if not self._args.dryrun:
                 instance_groups['masters'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, master_name, self.__network_url)
                 instance_groups['workers'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, worker_name, self.__network_url)
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
         return instance_groups
 
     def __create_internal_lb(self, lb_settings, instance_groups):
@@ -181,7 +179,7 @@ class Builder(buttlib.common.ButtBuilder):
         buttlib.gce.gce_network.create_forwarding_rule(self.__gce_conn, self._env_info['project'], self._env_info['region'], lb_settings['name'], backend_url, lb_settings['schema'], lb_settings['lbports'])
 
     def __create_load_balancers(self, instance_groups):
-        buttlib.helpers.BColors().bcprint("Creating load balancers ...", "HEADER")
+        cprint("Creating load balancers ...", "magenta")
         if not self._args.dryrun:
             lb_settings = {
                 "name": self._cluster_info['master_lb_name'],
@@ -200,7 +198,7 @@ class Builder(buttlib.common.ButtBuilder):
             }
             self.__create_internal_lb(lb_settings, instance_groups['workers'])
 
-            ### EXAMPLE of external load balancer not currently needed for gce k8s setup
+            # EXAMPLE of external load balancer not currently needed for gce k8s setup
             # lb_settings = {
             #     "name": self._cluster_info['master_lb_name'],
             #     "proto": "tcp",
@@ -209,19 +207,18 @@ class Builder(buttlib.common.ButtBuilder):
             #     "schema": "http",
             # }
             # self.__create_external_lb(lb_settings)
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
 
     def __create_vm(self, zone, vm_config):
         operation = ""
-        buttlib.helpers.BColors().bcprint("Creating VM {} ... ".format(vm_config['name']), "HEADER")
+        cprint("Creating VM {} ... ".format(vm_config['name']), "magenta")
         if not self._args.dryrun:
             operation = (self.__gce_conn.instances().insert(project=self._env_info['project'], zone=zone, body=vm_config).execute(), zone)
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
         return operation
 
     def __add_instance_to_groups(self, instance_groups, instances):
-        buttlib.helpers.BColors().bcprint("Adding instances to groups ...",
-                                          "HEADER")
+        cprint("Adding instances to groups ...", "magenta")
         if not self._args.dryrun:
             for instance in instances:
                 zone = (instance['zone'].split("/")[-1]).strip()
@@ -230,11 +227,10 @@ class Builder(buttlib.common.ButtBuilder):
                 else:
                     group = instance_groups['workers'][zone]['name']
                 buttlib.gce.gce_group.add_instance_to_group(self.__gce_conn, self._env_info['project'], zone, group, instance['targetLink'])
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
 
     def __add_to_target_pool(self, instances):
-        buttlib.helpers.BColors().bcprint(
-            "Adding instances to target pools ...", "HEADER")
+        cprint("Adding instances to target pools ...", "magenta")
         if not self._args.dryrun:
             worker_instances = [
                 {
@@ -246,11 +242,10 @@ class Builder(buttlib.common.ButtBuilder):
                 self.__gce_conn, worker_instances,
                 self._cluster_info['worker_lb_name'],
                 self._env_info['project'], self._env_info['region'])
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
 
     def __add_firewall_rules(self):
-        buttlib.helpers.BColors().bcprint("Adding default firewall rules ...",
-                                          "HEADER")
+        cprint("Adding default firewall rules ...", "magenta")
         if not self._args.dryrun and 'network' not in self._env_info:
             buttlib.gce.gce_network.create_firewall_rules(
                 self.__gce_conn, self.__network_url,
@@ -267,7 +262,7 @@ class Builder(buttlib.common.ButtBuilder):
                 "{}-health-checks".format(self._cluster_info['network_name']),
                 "tcp", ["80", "443"], self._env_info['googleHealthChecks'],
                 self._env_info['project'])
-        buttlib.helpers.BColors().bcprint("done", "OKBLUE")
+        cprint("done", "blue")
 
     def get_initial_cluster(self):
         """:returns: - string - etcd initial cluster string"""

@@ -2,7 +2,7 @@
 
 # import ipaddress
 import re
-import sys
+# import sys
 import boto3
 import yaml
 import json
