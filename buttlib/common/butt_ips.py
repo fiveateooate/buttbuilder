@@ -6,6 +6,7 @@ import random
 
 class ButtIps():
     """do stuff with ips for butts"""
+
     def __init__(self, network, subnet_mask=24, subnet_offset=0):
         self.__network = network
         self.__subnet_mask = subnet_mask

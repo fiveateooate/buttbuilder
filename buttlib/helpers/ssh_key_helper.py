@@ -3,10 +3,12 @@
 import re
 import os
 
+
 class SSHKeyHelper():
     """reads in rsa/dsa/ed25519 public keys for use in butt config"""
+
     def __init__(self):
-        self.__ssh_key_dir = "%s/.ssh/"%(os.path.expanduser("~"))
+        self.__ssh_key_dir = "%s/.ssh/" % (os.path.expanduser("~"))
         self.__ssh_pub_keys = self.read_public_keys()
 
     def read_public_keys(self):
@@ -14,7 +16,7 @@ class SSHKeyHelper():
         ssh_pub_keys = []
         pattern = re.compile(r'^.*_(rsa|dsa|ed25519).*.pub$')
         for key in [key for key in os.listdir(self.__ssh_key_dir) if re.search(pattern, key)]:
-            with open("%s/%s"%(self.__ssh_key_dir, key), 'r') as file:
+            with open("%s/%s" % (self.__ssh_key_dir, key), 'r') as file:
                 ssh_pub_keys.append(file.read())
         return ssh_pub_keys
 

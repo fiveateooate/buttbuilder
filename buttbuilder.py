@@ -13,7 +13,7 @@ def build(args, cluster_config_info, builder):
         print(exception)
     except buttlib.common.IncompleteEnvironmentSetup as exception:
         print(exception)
-    except buttlib.exceptions.LibVirtConnectionError as exception:
+    except buttlib.common.LibVirtConnectionError as exception:
         print(exception)
     except buttlib.common.DoNotDestroyCluster as exception:
         print(exception)
