@@ -19,7 +19,10 @@ class ButtBuilder(object):
         __subnet_mask = env_info['network']['subnetMask'] if 'network' in env_info and 'subnetMask' in env_info['network'] else 24
         __subnet_offset = env_info['network']['subnetOffset'] if 'network' in env_info and 'subnetOffset' in env_info['network'] else 0
         # used in a couple places in __init__
-        __cluster_name = "{}-{}".format(args.cenv, args.cid)
+        __cluster_name = "{}-{}".format(args.cenv, args.cid.replace(":", "-"))
+        __master_lb_name = env_info['masterLBName'] if 'masterLBName' in env_info else "kube-master-load-{}-{}".format(args.cenv, args.cid.replace(":", "-"))
+        __master_lb_ip_offset = env_info['masterLBIPOffset'] if 'masterLBIPOffset' in env_info else 2
+        __worker_lb_name = env_info['workerLBName'] if 'workerLBName' in env_info else "kube-worker-load-{}-{}".format(args.cenv, args.cid.replace(":", "-"))
         # offset begining master ips default is 10 to allow for dns, k8s cluster ip, ...
         __master_ip_offset = env_info['masters']['ipOffset'] if 'ipOffset' in env_info['masters'] else 10
         # offset for beginning worker ips, leave some room for masters
@@ -78,7 +81,9 @@ class ButtBuilder(object):
                 "masters": __master_ip_offset,
                 "workers": __worker_ip_offset
             },
-            "kube_master_lb_ip": "",  # these can/should be set in subclass mostly here to keep things from puking
+            "kube_master_lb_ip": self._butt_ips.get_ip(__master_lb_ip_offset),
+            "master_lb_name": __master_lb_name,
+            "worker_lb_name": __worker_lb_name,
             "optionalHostnameOverride": "",
             "additionalLabels": ["beta.kubernetes.io/kube-proxy-ds-ready=true"],
             "nameserver_config": "",

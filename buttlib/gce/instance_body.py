@@ -6,7 +6,8 @@ https://cloud.google.com/compute/docs/reference/latest/instances#resource
 import json
 
 
-class InstanceBody(object):
+class InstanceBody:
+    # maps to expected gce json for instance body - don't alter
     def __init__(self, name="", machine_type="", zone="", image="", subnetwork_url="", disk_size=""):
         # both name and machineType should be set
         self.name = name
@@ -78,5 +79,5 @@ class InstanceBody(object):
         self.networkInterfaces[0]["subnetwork"] = subnetwork_url
         # self.networkInterfaces[0]["networkIP"] = ip_address
 
-    def json(self):
-        return json.dumps(self.__dict__)
+    # def json(self):
+    #     return json.dumps(self.__dict__)

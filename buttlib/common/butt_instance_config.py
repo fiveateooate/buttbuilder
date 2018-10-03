@@ -20,13 +20,14 @@ class ButtInstanceConfig(object):
     ___ALLOWED_ROLES__ = ['masters', 'workers']
 
     # the whole point of this is to create the ign
-    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, mac=None, platform="custom", exclude_modules=[], provider_additional=None):
+    def __init__(self, hostname, ip, role, ssl_helper, env_info, cluster_info, mac=None, platform="custom", exclude_modules=[], provider_additional=None, additional_labels=[]):
         if role not in ButtInstanceConfig.___ALLOWED_ROLES__:
             raise buttlib.exceptions.UnknownRoleError(role)
         __exclude_modules = exclude_modules if exclude_modules else ButtInstanceConfig.__DEFAULT_EXCLUDE_MODULES__[role]
         ssl_helper.generateHost(hostname, ip)
         self.__buttdir = cluster_info['buttdir']
         self.__instance_config = {
+            "role": role,
             "hostname": hostname,
             "buttdir": cluster_info['buttdir'],
             "mac": mac if mac is not None else buttlib.common.random_mac(),
@@ -34,7 +35,7 @@ class ButtInstanceConfig(object):
             "disk": env_info[role]['disk'],
             "ram": env_info[role]['ram'] if 'ram' in env_info[role] else None,
             "cpus": env_info[role]['cpus'] if 'cpus' in env_info[role] else None,
-            "additionalLabels": ','.join(cluster_info['additionalLabels']),
+            "additionalLabels": ','.join(cluster_info['additionalLabels'] + additional_labels),
             "exclude_modules": __exclude_modules,
             "host_pem": ssl_helper.getInfo()["{}_pem".format(hostname)],
             "host_key": ssl_helper.getInfo()["{}_key".format(hostname)],
@@ -87,6 +88,18 @@ class ButtInstanceConfig(object):
     @property
     def ign_sha512(self):
         return self.__ign_sha512
+
+    @property
+    def role(self):
+        return self.__instance_config['role']
+
+    @property
+    def hostname(self):
+        return self.__instance_config['hostname']
+
+    @property
+    def ip(self):
+        return self.__instance_config['ip']
 
     def write_ign(self):
         with open(self.__instance_config['filename'], "w+b") as fp:

@@ -7,9 +7,9 @@ import buttlib
 from googleapiclient import errors
 
 
-def list(client):
+def list_instances(client):
     retval = []
-    region_info = buttlib.gce.regions.get(client)
+    region_info = buttlib.gce.regions.get_region(client)
     for zone in region_info['zones']:
         zone_name = (zone.split("/")[-1]).strip()
         request = client.connection.instances().list(project=client.project, zone=zone_name)
@@ -22,10 +22,10 @@ def list(client):
     return retval
 
 
-def get(client, instance_name):
+def get_instance(client, zone, instance_name):
     instance = {}
     try:
-        instance = client.connection.instances().get(project=client.project, zone=client.zone, instance=instance_name).execute()
+        instance = client.connection.instances().get(project=client.project, zone=zone, instance=instance_name).execute()
     except errors.HttpError as exc:
         if exc.resp.status == 404:
             instance = {}
@@ -35,28 +35,28 @@ def get(client, instance_name):
     return instance
 
 
-def create(client, body):
+def create_instance(client, zone, body):
     instance = {}
     try:
-        operation = client.connection.instances().insert(project=client.project, zone=client.zone, body=body).execute()
-        buttlib.gce.zone_operations.wait(client, operation['name'])
-        retval = get(client, body['name'])
+        operation = client.connection.instances().insert(project=client.project, zone=zone, body=body).execute()
+        buttlib.gce.operations.zone_wait(client, zone, operation['name'])
+        instance = get_instance(client, zone, body['name'])
     except errors.HttpError as exc:
-        retval = None
+        instance = None
         print(exc)
-    return retval
+    return instance
 
 
-def delete(client, instance_name):
-    retval = {"name": instance_name}
-    try:
-        operation = client.connection.instances().delete(project=client.project, zone=client.zone, instance=instance_name).execute()
-        buttlib.gce.zone_operations.wait(client, operation['name'])
-        retval = get(client, instance_name)
-    except errors.HttpError as exc:
-        print(exc)
-    return retval
-
-
-def start(client, instance):
-    pass
+# def delete(client, instance_name):
+#     retval = {"name": instance_name}
+#     try:
+#         operation = client.connection.instances().delete(project=client.project, zone=client.zone, instance=instance_name).execute()
+#         buttlib.gce.zone_operations.wait(client, operation['name'])
+#         retval = get(client, instance_name)
+#     except errors.HttpError as exc:
+#         print(exc)
+#     return retval
+#
+#
+# def start(client, instance):
+#     pass

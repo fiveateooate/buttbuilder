@@ -1,17 +1,16 @@
 """ build a gce butt"""
-# import os
-import re
-from termcolor import cprint
-import yaml
+
+import sys
+from termcolor import cprint, colored
+import pprint
+import copy
 import buttlib
-# from googleapiclient import discovery
-# from oauth2client.client import GoogleCredentials
+
 
 _CONFIG_TMPL = {
-    'name':
-    '',
-    'machineType':
-    '',
+    'name': '',
+    'machineType': '',
+    'labels': {},
     # Specify the boot disk and the image to use as a source.
     'disks': [{
         'boot': True,
@@ -35,11 +34,12 @@ _CONFIG_TMPL = {
     }],
     # Allow the instance to access butt storage and logging.
     'serviceAccounts': [{
-        'email':
-        'default',
+        'email': 'default',
         'scopes': [
             'https://www.googleapis.com/auth/devstorage.read_write',
-            'https://www.googleapis.com/auth/logging.write'
+            'https://www.googleapis.com/auth/logging.write',
+            'https://www.googleapis.com/auth/monitoring.write',
+            'https://www.googleapis.com/auth/cloud-platform'
         ]
     }],
     # Metadata is readable from the instance and allows you to
@@ -60,59 +60,202 @@ class Builder(buttlib.common.ButtBuilder):
         buttlib.common.ButtBuilder.__init__(self, env_info, args)
 
         self.client = buttlib.gce.GCEClient(project=self._env_info['project'], region=self._env_info['region'])
-        # self.__ssl_helper = buttlib.helpers.SSLHelper(self._env_info['clusterDomain'], "{}/ssl".format(self._cluster_info['buttdir']), bits=2048)
-        self._cluster_info['master_lb_name'] = self._env_info['masterLBName']
-        # self._cluster_info['worker_lb_name'] = ButtBuilder.LB_NAME_TMPLT.format(type="worker", cluster_name=self._cluster_info['cluster_name'])
         self._cluster_info['ip'] = "$private_ipv4"
-        self.__network_url = None
-        self._cluster_info['kube_master_lb_ip'] = self._env_info['masterLBName']
-        # self._cluster_info['master_ip'] = self._butt_ips.get_ip(2)
-        # self._cluster_info['worker_ip'] = self._butt_ips.get_ip(3)
-        # self._cluster_info['kube_masters'] = self.get_kube_masters()
-        # self._cluster_info['ipOffsets'] = {"masters": 30, "workers": 50}
-        # self._cluster_info["etcd_initial_cluster"] = self.get_initial_cluster()
+        self._cluster_info['master_lb_ip'] = self._butt_ips.get_ip(2)
+        self._cluster_info['worker_lb_ip'] = self._butt_ips.get_ip(3)
         # setting butt provider to gce doesn't work out of the box need to figure out a buncha crap
         # enabling it make it do things like try to create load balancers and stuff and breaks scheduling
         self._cluster_info['buttProvider'] = "gce"
+        self.__region_info = buttlib.gce.regions.get_region(self.client)
+        self.__network_url = buttlib.gce.networks.get_network(self.client, self._cluster_info['network_name'])
+        self.__instance_groups = self.__instance_group_skel()
         # if "network" in self._env_info:
         #     with open("butt-templates/stubs/gce_hosts.yaml", "r") as file:
         #         self._cluster_info['hostsfile_tmpl'] = file.read()
         #     with open("butt-templates/stubs/gce_resolvconf.yaml", "r") as file:
         #         self._cluster_info['resolvconf'] = file.read()
 
+    def __create_network(self) -> str:
+        network_url = ""
+        cprint("Creating network ...", "magenta")
+        if self._args.dryrun:
+            print("would have created network {}".format(self._cluster_info['network_name']))
+        else:
+            network_url = buttlib.gce.networks.create_network(self.client, self._cluster_info['network_name'], self._env_info['externalNet'])
+        cprint("done", "blue")
+        return network_url
+
+    def __provider_additional(self, index: int, ip: str, hostname: str, role: str) -> dict:
+        pa = {
+            "rootDiskSize": self._env_info[role]['disk']
+        }
+        return pa
+
+    def __instance_group_skel(self) -> dict:
+        instance_groups = {}
+        for zone in self.__region_info['zones']:
+            zone_name = (zone.split("/")[-1]).strip()
+            instance_groups[zone_name] = {
+                "masters": {
+                    "name": "kube-masters-{}-{}".format(self._cluster_info['cluster_name'], zone_name),
+                    "url": ""
+                },
+                "workers": {
+                    "name": "kube-workers-{}-{}".format(self._cluster_info['cluster_name'], zone_name),
+                    "url": ""
+                }
+            }
+        return instance_groups
+
+    def __add_instance_groups(self) -> dict:
+        """create gce instance groups"""
+        cprint("Checking/Creating instance groups ...", "magenta")
+        for zone, groups in self.__instance_groups.items():
+            for role in ['masters', 'workers']:
+                group_url = buttlib.gce.instance_groups.get_group(self.client, zone, groups[role]['name'])
+                if group_url == {}:
+                    cprint("creating group {} in {}".format(groups[role]['name'], zone), "yellow")
+                    if not self._args.dryrun:
+                        groups[role]['url'] = buttlib.gce.instance_groups.create_group(self.client, zone, groups[role]['name'], self.__network_url)
+                elif group_url is not {} and group_url is not None:
+                    cprint("group {} {}".format(groups[role]['name'], colored("ok", "green")))
+                    self.__instance_groups[zone][role]['url'] = group_url
+                else:
+                    cprint("die die die", "red")
+                    sys.exit(1)
+        cprint("done", "blue")
+
+    def __add_load_balancers(self):
+        cprint("Creating load balancers ...", "magenta")
+        lb_settings = {
+            "name": self._cluster_info['master_lb_name'],
+            "proto": "tcp",
+            "hcport": "443",
+            "lbports": [443, 2379],
+            "ip": self._cluster_info['master_lb_ip']
+        }
+        if self._args.verbose:
+            print(lb_settings)
+        if not self._args.dryrun:
+            pass
+            # self.__create_internal_lb(lb_settings, instance_groups['masters'])
+        lb_settings = {
+            "name": self._cluster_info['worker_lb_name'],
+            "proto": "tcp",
+            "hcport": "80",
+            "lbports": [80, 30000, 30012, 30014, 30016, 30040, 30656],
+            "ip": self._cluster_info['worker_lb_ip']
+        }
+        if self._args.verbose:
+            print(lb_settings)
+        if not self._args.dryrun:
+            pass
+            # self.__create_internal_lb(lb_settings, instance_groups['workers'])
+        cprint("done", "blue")
+
+    def __instance_config(self, bic: buttlib.common.ButtInstanceConfig, zone: str):
+        # vm_config = buttlib.gce.InstanceBody(name=bic.hostname, machine_type=self._env_info[bic.role]['machineType'], zone=zone, image=self.__image['selfLink'], subnetwork_url=self.__network_url, disk_size=self._env_info[bic.role]['disk'])
+        zone_name = (zone.split("/")[-1]).strip()
+        vm_config = copy.deepcopy(_CONFIG_TMPL)
+        vm_config['name'] = bic.hostname
+        vm_config['machineType'] = "zones/{}/machineTypes/{}".format(zone_name, self._env_info[bic.role]['machineType'])
+        vm_config['disks'][0]['initializeParams']['sourceImage'] = self.__image['selfLink']
+        vm_config['disks'][0]['initializeParams']['diskSizeGb'] = self._env_info[bic.role]['disk']
+        vm_config['disks'][0]['initializeParams']['diskType'] = "zones/{}/diskTypes/pd-ssd".format(zone_name)
+        vm_config['networkInterfaces'][0]['network'] = self.__network_url
+        vm_config['networkInterfaces'][0]['networkIP'] = bic.ip
+        vm_config['metadata']['items'][0]['value'] = bic.ign
+        vm_config['labels']['cenv'] = self._cluster_info['cluster_env']
+        vm_config['labels']['cid'] = self._cluster_info['cluster_id'].replace(":", "-")
+        vm_config['labels']['cluster-role'] = bic.role
+        return vm_config
+
+    def __create_vm(self, vm_config, zone):
+        instance = None
+        zone_name = (zone.split("/")[-1]).strip()
+        if not self._args.dryrun:
+            instance = buttlib.gce.instances.get_instance(self.client, zone_name, vm_config['name'])
+            if instance == {}:
+                cprint("Creating instance {} in {}...".format(vm_config['name'], zone_name), "magenta")
+                instance = buttlib.gce.instances.create_instance(self.client, zone_name, vm_config)
+                cprint("done", "green")
+            elif instance is not None:
+                ok = colored("ok", "green")
+                cprint("instance {} {}".format(vm_config['name'], ok))
+            else:
+                cprint("die die die", "red")
+                sys.exit(1)
+        return instance
+
+    def __create_instance(self, hostname, ip, index, role, zone):
+        pp = pprint.PrettyPrinter()
+        zone_name = (zone.split("/")[-1]).strip()
+        provider_additional = self.__provider_additional(index, ip, hostname, 'masters')
+        additional_labels = [
+            "failure-domain.beta.kubernetes.io/region={}".format(self._env_info['region']),
+            "failure-domain.beta.kubernetes.io/zone={}".format(zone_name)
+        ]
+        bic = buttlib.common.ButtInstanceConfig(hostname, ip, 'masters', self._ssl_helper, self._env_info, self._cluster_info, platform="gce", provider_additional=provider_additional, additional_labels=additional_labels)
+        # write out the config
+        bic.write_ign()
+        # self.upload_ign(bic.instance_config['filename'], hostname)
+        instance_body = self.__instance_config(bic, zone)
+        if self._args.verbose:
+            pp.pprint(instance_body)
+        instance = self.__create_vm(instance_body, zone)
+        return instance
+
+    def __add_instance_to_group(self, instance, zone, role):
+        cprint("Adding instance to group ...", "magenta")
+        if not self._args.dryrun:
+            zone_name = (zone.split("/")[-1]).strip()
+            group = self.__instance_groups[zone_name][role]['url']
+            print(group)
+            # if re.search("-master-", instance['targetLink']):
+            #     group = instance_groups['masters'][zone]['name']
+            # else:
+            #     group = instance_groups['workers'][zone]['name']
+            # buttlib.gce.group.add_instance_to_group(self.__gce_conn, self._env_info['project'], zone, group, instance['targetLink'])
+        cprint("done", "blue")
+
     def __pre_build(self):
-        masters = self._kube_masters.hostnames
-        masters.append(self._cluster_info['kube_master_lb_ip'])
-        self._ssl_helper.create_or_load_certs(self._kube_masters.ips, self._cluster_info["cluster_ip"], masters)
-        self.__image = buttlib.gce.GCEImages.getFromFamily(self.client)
+        cprint("Collecting cluster info ...", "cyan")
+        masters = self._kube_masters.hostnames + [self._cluster_info['master_lb_name']]
+        ips = self._kube_masters.ips + [self._cluster_info['kube_master_lb_ip']]
+        self._ssl_helper.create_or_load_certs(ips, self._cluster_info["cluster_ip"], masters)
+        self.__image = buttlib.gce.images.getFromFamily(self.client)
+        cprint("using image {}".format(self.__image['selfLink']))
+        if self.__network_url is None:
+            cprint("TODO: self.__create_network()", "red")
+            # punt for now
+            sys.exit(1)
+        cprint("using network {}".format(self.__network_url['selfLink']))
+        self.__add_instance_groups()
+        self.__add_load_balancers()
+        cprint("done", "blue")
 
-    # def __get_hostname(self, role, index):
-    #     hostname = "kube-worker-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index+1)
-    #     if role == "masters":
-    #         hostname = "kube-master-{cluster_name}-{suffix:02d}".format(cluster_name=self._cluster_info['cluster_name'], suffix=index + 1)
-    #     return hostname
-
-    # def generate_vm_config(self, role, image, index, zone):
-    #     """
-    #     Generate parameter dictionary sutiable for kubernetes worker
-    #         new SSL keys will be generated
-    #     """
-    #     vm_info = {}
-    #     ip_address = self._butt_ips.get_ip(
-    #         index + self._cluster_info['ipOffsets'][role])
-    #     hostname = self.__get_hostname(role, index)
-    #     vm_tmp = {"hostname": hostname, "ip": ip_address}
-    #     vm_config = buttlib.gce.InstanceBody(name=hostname,
-    #                                          machine_type=self._env_info[role]['machineType'],
-    #                                          zone=zone,
-    #                                          image=image,
-    #                                          subnetwork_url=self.__network_url,
-    #                                          disk_size=self._env_info[role]['rootDiskSize'])
-    #     vm_config.set_userdata(self.get_user_data(role, vm_tmp))
-    #     # if butt provider works these probably are not needed
-    #     vm_config['additionalLabels'] = ",failure-domain.beta.kubernetes.io/region={}".format(self._env_info['region'])
-    #     vm_config['additionalLabels'] += ",failure-domain.beta.kubernetes.io/zone={}".format(zone)
-    #     return vm_config
+    def build(self):
+        """create the butt"""
+        print("create a butt")
+        self.__pre_build()
+        instances = []
+        index = 0
+        num_zones = len(self.__region_info['zones'])
+        for hostname, ip in self._kube_masters.masters:
+            role = "masters"
+            zone = self.__region_info['zones'][index % num_zones]
+            instance = self.__create_instance(hostname, ip, index, role, zone)
+            self.__add_instance_to_group(instance, zone, role)
+            index += 1
+        index = 0
+        for hostname, ip in self._kube_workers.workers:
+            role = "workers"
+            zone = self.__region_info['zones'][index % num_zones]
+            instance = self.__create_instance(hostname, ip, index, role, zone)
+            self.__add_instance_to_group(instance, zone, role)
+            index += 1
+        # self.__add_to_target_pool(instances)
+        # self.__add_firewall_rules()
 
     # def get_master_info(self):
     #     return [
@@ -125,45 +268,7 @@ class Builder(buttlib.common.ButtBuilder):
     #
     # def get_master_ips(self):
     #     return [self._butt_ips.get_ip(i + self._cluster_info['ipOffsets']['masters']) for i in range(self._env_info['masters']['nodes'])]
-    #
-    # def __create_certs(self):
-    #     cprint("Creating certs ...", "magenta")
-    #     master_ips = self.get_master_ips()
-    #     master_ips.append(self._cluster_info['master_ip'])
-    #     self.__ssl_helper.createCerts(master_ips, self._cluster_info["cluster_ip"], self.get_master_hosts())
-    #     cprint("done", "blue")
 
-    # def __create_or_get_network(self):
-    #     network_url = ""
-    #     cprint("Creating network ...", "magenta")
-    #     network = buttlib.gce.networks.get(self.client, self._cluster_info['network_name'])
-    #     if network:
-    #         network_url = network['selfLink']
-    #     else:
-    #         if self._args.dryrun:
-    #             print("would have created network {}".format(self._cluster_info['network_name']))
-    #         else:
-    #             network_url = buttlib.gce.networks.create(self.client, self._cluster_info['network_name'], self._env_info['externalNet'])
-    #     cprint("done", "blue")
-    #     return network_url
-    #
-    # def __create_or_get_instance_groups(self):
-    #     """create a gce instance group"""
-    #     instance_groups = {'masters': {}, 'workers': {}}
-    #     region_info = buttlib.gec.regions.get(self.client)
-    #     cprint("Creating instance groups ...", "magenta")
-    #     # if not self._args.dryrun:
-    #     for zone in region_info['zones']:
-    #         zone_name = (zone.split("/")[-1]).strip()
-    #         master_name = "kube-masters-{cluster}-{zone}".format(cluster=self._cluster_info['cluster_name'], zone=zone_name)
-    #         instance_groups['masters'][zone_name] = {"name": master_name, "url": ""}
-    #         worker_name = "kube-workers-{cluster}-{zone}".format(cluster=self._cluster_info['cluster_name'], zone=zone_name)
-    #         instance_groups['workers'][zone_name] = {"name": worker_name, "url": ""}
-    #         if not self._args.dryrun:
-    #             instance_groups['masters'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, master_name, self.__network_url)
-    #             instance_groups['workers'][zone_name]['url'] = buttlib.gce.instance_groups.create(self.client, zone_name, worker_name, self.__network_url)
-    #     cprint("done", "blue")
-    #     return instance_groups
     #
     # def __create_internal_lb(self, lb_settings, instance_groups):
     #     backend_url = buttlib.gce.gce_network.create_internal_backend_service(self.__gce_conn, self._env_info['project'], self._env_info['region'], lb_settings['name'], instance_groups, lb_settings['hcport'])
@@ -182,57 +287,6 @@ class Builder(buttlib.common.ButtBuilder):
     # def __create_external_lb(self, lb_settings):
     #     backend_url = buttlib.gce.gce_network.create_target_pool(self.__gce_conn, lb_settings['name'], self._env_info['project'], self._env_info['region'], lb_settings['hcport'])
     #     buttlib.gce.gce_network.create_forwarding_rule(self.__gce_conn, self._env_info['project'], self._env_info['region'], lb_settings['name'], backend_url, lb_settings['schema'], lb_settings['lbports'])
-    #
-    # def __create_load_balancers(self, instance_groups):
-    #     cprint("Creating load balancers ...", "magenta")
-    #     if not self._args.dryrun:
-    #         lb_settings = {
-    #             "name": self._cluster_info['master_lb_name'],
-    #             "proto": "tcp",
-    #             "hcport": "443",
-    #             "lbports": [443, 2379, 8080],
-    #             "ip": self._cluster_info['master_ip']
-    #         }
-    #         self.__create_internal_lb(lb_settings, instance_groups['masters'])
-    #         lb_settings = {
-    #             "name": self._cluster_info['worker_lb_name'],
-    #             "proto": "tcp",
-    #             "hcport": "80",
-    #             "lbports": [80, 30000, 30012, 30014, 30016, 30040, 30656],
-    #             "ip": self._cluster_info['worker_ip']
-    #         }
-    #         self.__create_internal_lb(lb_settings, instance_groups['workers'])
-    #
-    #         # EXAMPLE of external load balancer not currently needed for gce k8s setup
-    #         # lb_settings = {
-    #         #     "name": self._cluster_info['master_lb_name'],
-    #         #     "proto": "tcp",
-    #         #     "port": "80-443",
-    #         #     "ip": self._cluster_info['master_ip'],
-    #         #     "schema": "http",
-    #         # }
-    #         # self.__create_external_lb(lb_settings)
-    #     cprint("done", "blue")
-
-    # def __create_vm(self, zone, vm_config):
-    #     operation = ""
-    #     cprint("Creating VM {} ... ".format(vm_config['name']), "magenta")
-    #     if not self._args.dryrun:
-    #         operation = (self.__gce_conn.instances().insert(project=self._env_info['project'], zone=zone, body=vm_config).execute(), zone)
-    #     cprint("done", "blue")
-    #     return operation
-
-    # def __add_instance_to_groups(self, instance_groups, instances):
-    #     cprint("Adding instances to groups ...", "magenta")
-    #     if not self._args.dryrun:
-    #         for instance in instances:
-    #             zone = (instance['zone'].split("/")[-1]).strip()
-    #             if re.search("-master-", instance['targetLink']):
-    #                 group = instance_groups['masters'][zone]['name']
-    #             else:
-    #                 group = instance_groups['workers'][zone]['name']
-    #             buttlib.gce.gce_group.add_instance_to_group(self.__gce_conn, self._env_info['project'], zone, group, instance['targetLink'])
-    #     cprint("done", "blue")
     #
     # def __add_to_target_pool(self, instances):
     #     cprint("Adding instances to target pools ...", "magenta")
@@ -297,64 +351,6 @@ class Builder(buttlib.common.ButtBuilder):
         # instance = buttlib.instance.get(client, instance_name)
         # buttlib.gce.instance.delete(client, instance_name)
         # adjust fw/lb
-
-    def build(self):
-        """create the butt"""
-        print("create a butt")
-        self.__pre_build()
-        cprint(self.__image, "yellow")
-        for hostname, ip in self._kube_masters.masters:
-            provider_additional = []
-            bic = buttlib.common.ButtInstanceConfig(
-                hostname,
-                ip,
-                'masters',
-                self._ssl_helper,
-                self._env_info,
-                self._cluster_info,
-                platform="gce",
-                provider_additional=provider_additional
-            )
-            print(bic)
-            # write out the config
-            # bic.write_ign()
-            # self.upload_ign(bic.instance_config['filename'], hostname)
-            # index += 1
-        # instances = []
-        # operations = []
-        # image = buttlib.gce.images.getFromFamily(self.client)
-        # region_info = buttlib.gce.regions.get(self.client)
-        # num_zones = len(region_info['zones'])
-        # self.__create_certs()
-        # self.__network_url = self.__create_or_get_network()
-        # instance_groups = self.__create_instance_groups()
-        # self.__create_load_balancers(instance_groups)
-        # for i in range(self._env_info['masters']['nodes']):
-        #     zone = region_info['zones'][i % num_zones]
-        #     zone_name = (zone.split("/")[-1]).strip()
-        #     vm_config = self.generate_vm_config("masters", image['selfLink'], i, zone_name)
-        #     if self._args.verbose:
-        #         print(vm_config)
-        #     operations.append((self.__create_vm(zone_name, vm_config)))
-        # for i in range(self._env_info['workers']['nodes']):
-        #     # TODO: change this to add node
-        #     # operation = add_node(config, whateverotherstuff)
-        #     pass
-        #     # zone = region_info['zones'][i % num_zones]
-        #     # zone_name = (zone.split("/")[-1]).strip()
-        #     # vm_config = self.generate_vm_config("workers", image['selfLink'], i, zone_name)
-        #     # if self._args.verbose:
-        #     #     print(vm_config)
-        #     # operations.append((self.__create_vm(zone_name, vm_config)))
-        # if not self._args.dryrun:
-        #     for operation in operations:
-        #         result = buttlib.gce.gce_common.wait_for_zone_operation(self.__gce_conn, self._env_info['project'], operation[1], operation[0]['name'])
-        #         if self._args.verbose:
-        #             print(result)
-        #         instances.append(result)
-        # self.__add_instance_to_groups(instance_groups, instances)
-        # self.__add_to_target_pool(instances)
-        # self.__add_firewall_rules()
 
     # def get_user_data(self, role, vm_info):
     #     """:params node_type: master or worker
