@@ -1,12 +1,12 @@
 - filesystem: "root"
-  path: "/etc/kube-proxy/kube-proxy.conf"
+  path: "/etc/kubernetes/config/kube-proxy.conf"
   mode: 0644
   contents:
     inline: |
       apiVersion: kubeproxy.config.k8s.io/v1alpha1
       kind: KubeProxyConfiguration
       clientConnection:
-        kubeconfig: /etc/kube-proxy/kubeconfig.yaml
+        kubeconfig: /etc/kubernetes/kubeconfig.yaml
       clusterCIDR: {cluster_cidr}
       healthzBindAddress: 0.0.0.0:10256
       metricsBindAddress: 0.0.0.0:10249
