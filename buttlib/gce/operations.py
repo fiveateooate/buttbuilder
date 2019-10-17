@@ -48,5 +48,4 @@ def global_wait(client, operation):
             if 'error' in result:
                 raise Exception(result['error'])
             return result
-
-    time.sleep(1)
+        time.sleep(1)
